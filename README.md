@@ -1,4 +1,4 @@
-# poietikês
+# poietikes
 
 Prosodic analysis in Julia, inspired by Python [prosodic](https://pypi.org/project/prosodic/). 
 

@@ -152,7 +152,7 @@ text
 
 ### Lineage and references
 
-poietikes is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) (Ryan Heuser), which implements the work of Paul Kiparsky and Kristin Hanson in "A Parametric Theory of Poetic Meter," published in *Language*, 1996. The primary way by which we differentiate our two approaches is that we consider prosodic to be primarily focused on metrical-phonological features of human speech directed at metered poetry, and poietikes comes directly with context of poetic forms beyond meter in order to analyze a given text. 
+poietikes is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) [(Ryan Heuser)](https://www.english.cam.ac.uk/people/Ryan.Heuser), which implements the work of Paul Kiparsky and Kristin Hanson in "A Parametric Theory of Poetic Meter," published in *Language*, 1996. The primary way by which we differentiate our two approaches is that we consider prosodic to be primarily focused on metrical-phonological features of human speech directed at metered poetry, and poietikes comes directly with context of poetic forms beyond meter in order to analyze a given text. 
 
 Our derivations from prosodic include:
 - constraint-based view of metrical parsing — a line is scanned by minimizing the violations of weighted, violable constraints over candidate parses;

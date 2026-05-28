@@ -39,11 +39,13 @@ function detect_language(text::AbstractString)
     nonspace = count(!isspace, text)
     jp = count(c -> _is_kana(c) || _is_kanji(c), text)
     sa = count(c -> ('ऀ' <= c <= 'ॿ') || c in _IAST_SIGNALS, text)   # Devanāgarī / IAST
+    zh = count(_ -> true, eachmatch(r"[a-zA-ZüÜ]+[1-5]", text))      # pinyin-with-tone syllables
     bonus = _diacritic_bonus!(Dict{DataType,Float64}(English => 0.0, French => 0.0,
                                                       Spanish => 0.0, Italian => 0.0), text)
     score = Dict{DataType,Float64}()
     score[Japanese] = nonspace == 0 ? 0.0 : jp / nonspace
     score[Sanskrit] = nonspace == 0 ? 0.0 : sa / nonspace
+    score[Chinese]  = isempty(toks) ? 0.0 : zh / length(toks)        # pinyin-with-tones fraction
     for L in (English, French, Spanish, Italian)
         hits = isempty(toks) ? 0 : count(t -> t in _STOPWORDS[L], toks)
         frac = isempty(toks) ? 0.0 : hits / length(toks)
@@ -52,7 +54,7 @@ function detect_language(text::AbstractString)
     score[English] += 0.05      # default prior for unmarked Latin-script text (poetry fallback)
 
     ranked = [Ranked(l, normalize_score(RawScore{LangConfidence}(clamp(score[typeof(l)], 0, 1))))
-              for l in (English(), French(), Spanish(), Italian(), Japanese(), Sanskrit())]
+              for l in (English(), French(), Spanish(), Italian(), Japanese(), Sanskrit(), Chinese())]
     sort!(ranked; by = r -> r.score.value, rev = true)
     return ranked
 end
@@ -65,9 +67,11 @@ _score_analysis(a::FormFit)         = normalize_score(RawScore{OTViolations}(   
 _score_analysis(a::CountFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)))
 _score_analysis(a::SyllabicFit)     = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::QuantitativeFit) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
+_score_analysis(a::TonalFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
+_score_analysis(a::AllitFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::RhymeFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::StructureFit)    = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(::ProsodicFeatures) = NormScore(0.6, [:free_verse => 0.6])  # only a near-perfect fit beats free verse
+_score_analysis(::ProsodicFeatures) = NormScore(_FREEVERSE_BASELINE[], [:free_verse => _FREEVERSE_BASELINE[]])
 _score_analysis(::Unsupported)      = NormScore(0.0, Pair{Symbol,Float64}[])
 
 _analyze_form(f::Form, lang::Language, parsed::ParsedPoem) =

@@ -30,3 +30,37 @@ calibrate_ot_scale(metrical, control) = max((_mean(metrical) + _mean(control)) /
 
 "Install a calibrated OTViolations scale (see `normalize_score`)."
 set_ot_scale!(s::Real) = (_OT_SCALE[] = Float64(s); nothing)
+
+"Set the free-verse baseline a constrained form must beat in detection."
+set_freeverse_baseline!(x::Real) = (_FREEVERSE_BASELINE[] = Float64(x); nothing)
+
+"""
+    learn_constraint_weights(metrical, control; form, language) -> Dict{DataType,Float64}
+
+A simple discriminative estimate of metrical-constraint weights: each weight ← how much more
+the constraint fires (per line) in non-metrical `control` verse than in known-metrical verse.
+This exposes what a corpus can pin down — a constraint the controls never exercise gets ~0,
+revealing under-determination (full Harmonic-Grammar weight learning needs near-metrical
+minimal pairs). Returns a Dict installable via `set_constraint_weight!`; not auto-applied.
+"""
+function learn_constraint_weights(metrical, control;
+                                  form = Sonnet{Shakespearean}(), language = English(),
+                                  constraints = default_constraints())
+    meter = build_meter(meterspec(form, language))
+    function meanviol(texts)
+        totals = Dict{DataType,Float64}(typeof(c) => 0.0 for c in constraints)
+        n = 0
+        for t in texts, l in lines(prosodic_parse(t, language))
+            syls = Syllable[u for u in l.units if u isa Syllable]
+            parse, _, _ = best_parse(meter, syls, constraints)
+            parse === nothing && continue
+            for c in constraints
+                totals[typeof(c)] += violations(c, parse)
+            end
+            n += 1
+        end
+        return n == 0 ? totals : Dict(k => v / n for (k, v) in totals)
+    end
+    mv, cv = meanviol(metrical), meanviol(control)
+    return Dict(k => max(cv[k] - mv[k], 0.0) for k in keys(cv))
+end

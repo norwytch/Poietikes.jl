@@ -27,6 +27,11 @@ end
 # `set_ot_scale!` re-tunes it. Other kinds keep parameter-free 1/(1+x) (their costs are small).
 const _OT_SCALE = Ref(12.0)
 
+# Free-verse baseline: the score a constrained form must beat to win over "it's just free verse".
+# Tunable (set_freeverse_baseline!); 0.6 means only a near-perfect fit wins. Calibrating it
+# against a labelled form/free-verse corpus is tracked deferred work.
+const _FREEVERSE_BASELINE = Ref(0.6)
+
 normalize_score(s::RawScore{LangConfidence}) = NormScore(clamp(s.value, 0, 1),       [:lang_conf => s.value])
 normalize_score(s::RawScore{OTViolations})   = NormScore(1 / (1 + s.value / _OT_SCALE[]), [:ot_viol => s.value])
 normalize_score(s::RawScore{CountDistance})  = NormScore(1 / (1 + s.value),          [:count     => s.value])

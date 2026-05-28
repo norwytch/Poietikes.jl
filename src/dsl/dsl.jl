@@ -14,7 +14,8 @@ formname(f::DataForm) = f.name
 const _AXIS = Dict(:count     => (:CountSpec, :countspec),
                    :meter     => (:MeterSpec, :meterspec),
                    :rhyme     => (:RhymeSpec, :rhymespec),
-                   :structure => (:StructureSpec, :structurespec))
+                   :structure => (:StructureSpec, :structurespec),
+                   :allit     => (:AllitSpec, :allitspec))
 
 """
     @form Name Language begin

@@ -11,6 +11,7 @@ function _resolve_language(s::Symbol)
     s === :spanish  && return Spanish()
     s === :italian  && return Italian()
     s === :sanskrit && return Sanskrit()
+    s === :chinese  && return Chinese()
     error("unknown language :$s")
 end
 
@@ -22,6 +23,8 @@ function _resolve_form(s::Symbol)
     s === :endecasillabo  && return Endecasillabo()
     s === :octosilabo     && return Octosilabo()
     s === :bhujangaprayata && return Bhujangaprayata()
+    s === :jueju  && return Jueju()
+    s === :alliterative && return Alliterative()
     s === :sonnet && return Sonnet{Shakespearean}()
     error("unknown form :$s")
 end

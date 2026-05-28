@@ -8,12 +8,14 @@ countspec(::Form, ::Language)     = nothing
 meterspec(::Form, ::Language)     = nothing
 rhymespec(::Form, ::Language)     = nothing
 structurespec(::Form, ::Language) = nothing
+allitspec(::Form, ::Language)     = nothing
 
 # Data-driven forms read their specs from carried data instead of dispatched methods.
 countspec(f::DataForm, ::Language)     = get(f.specs, :count, nothing)
 meterspec(f::DataForm, ::Language)     = get(f.specs, :meter, nothing)
 rhymespec(f::DataForm, ::Language)     = get(f.specs, :rhyme, nothing)
 structurespec(f::DataForm, ::Language) = get(f.specs, :structure, nothing)
+allitspec(f::DataForm, ::Language)     = get(f.specs, :allit, nothing)
 
 # Descriptive vs prescriptive is a positive declaration, so a constraint-free form (on
 # purpose) is distinguishable from a prescriptive form whose specs were never written.

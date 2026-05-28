@@ -12,6 +12,7 @@ struct French   <: Language end
 struct Spanish  <: Language end
 struct Italian  <: Language end
 struct Sanskrit <: Language end
+struct Chinese  <: Language end
 
 # ── Forms ─────────────────────────────────────────────────────────────────────
 # A {Variant} type parameter expresses named flavors sharing a name within ONE tradition
@@ -28,6 +29,8 @@ struct Tanka        <: Form end
 struct Endecasillabo  <: Form end         # Italian hendecasyllable: last accent on the 10th
 struct Octosilabo     <: Form end         # Spanish octosyllable: 8 metrical syllables
 struct Bhujangaprayata <: Form end        # Sanskrit quantitative metre: four ya-gaṇas (L H H)×4
+struct Jueju <: Form end                  # Tang regulated quatrain: per-line tonal template
+struct Alliterative <: Form end           # Germanic alliterative verse: stressed onsets agree
 struct Sonnet{V<:SonnetVariant} <: Form end
 
 # Data-driven forms: a single type carrying its specs as runtime data (the non-programmer
@@ -60,6 +63,10 @@ Syllable(p::Vector{Phoneme}, stress::Integer, flexible::Bool, wf::Bool) = Syllab
 
 struct Mora <: ProsodicUnit
     content::String         # timing unit (Japanese); minimal for now
+end
+
+struct TonalSyllable <: ProsodicUnit
+    tone::Char              # 'P' level (平) or 'Z' oblique (仄) — Tang regulated verse
 end
 
 # ── Metrical vocabulary (types, so they dispatch and extend) ────────────────────
@@ -103,6 +110,10 @@ end
 struct StructureSpec
     nlines::Union{Int,Nothing}
     nstanzas::Union{Int,Nothing}
+end
+
+struct AllitSpec
+    min::Int                # minimum stressed syllables per line that must share an onset
 end
 
 # ── Analysis mode: descriptive vs prescriptive is DECLARED, not inferred ────────

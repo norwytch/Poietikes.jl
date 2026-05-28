@@ -3,6 +3,9 @@
 # Note how the same identity label `Sonnet` carries a completely different reality per
 # language: accentual-syllabic iambic pentameter in English, syllabic alexandrine in French.
 
+# ── Germanic alliterative verse: at least two stressed syllables per line share an onset ──
+allitspec(::Alliterative, ::English) = AllitSpec(2)
+
 # ── Counted forms: morae in Japanese, approximated by syllables in English ──
 countspec(::Haiku, ::Japanese) = CountSpec(Mora,     [5, 7, 5])
 countspec(::Haiku, ::English)  = CountSpec(Syllable, [5, 7, 5])
@@ -32,6 +35,9 @@ function _register_builtins!()
     register!(Octosilabo(), Spanish())
     register!(FreeVerse(), Sanskrit())
     register!(Bhujangaprayata(), Sanskrit())
+    register!(FreeVerse(), Chinese())
+    register!(Jueju(), Chinese())
+    register!(Alliterative(), English())
     register!(Haiku(), Japanese())
     register!(Haiku(), English())
     register!(Tanka(), Japanese())

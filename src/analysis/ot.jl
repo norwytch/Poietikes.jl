@@ -20,9 +20,23 @@ function violations end
 """
     weight(constraint) -> Float64
 
-Severity of the constraint in the weighted total (default 1.0). Override per constraint type.
+Severity of the constraint in the weighted total. Reads a mutable override store (set via
+`set_constraint_weight!`, e.g. by a weight learner), falling back to the principled default.
 """
-weight(::MetricalConstraint) = 1.0
+const _CONSTRAINT_WEIGHTS = Dict{DataType,Float64}()
+weight(c::MetricalConstraint) = get(_CONSTRAINT_WEIGHTS, typeof(c), _default_weight(c))
+
+"""
+    set_constraint_weight!(ConstraintType, w)
+    reset_constraint_weights!()
+
+Override (or clear all) metrical-constraint weights — the knob a calibrator/learner tunes.
+"""
+set_constraint_weight!(::Type{C}, w::Real) where {C<:MetricalConstraint} =
+    (_CONSTRAINT_WEIGHTS[C] = Float64(w); nothing)
+reset_constraint_weights!() = (empty!(_CONSTRAINT_WEIGHTS); nothing)
+
+_default_weight(::MetricalConstraint) = 1.0
 
 # Prominence order: primary stress (1) > secondary (2) > unstressed (0). (ARPABET digits don't
 # rank numerically, so we remap.)
@@ -87,7 +101,7 @@ function violations(::StressMaxInWeak, p::MetricalParse)
     _, str, pr = _realized(p)
     return count(i -> ispeak(pr, i) && str[i] isa Weak, eachindex(pr))
 end
-weight(::StressMaxInWeak) = 4.0
+_default_weight(::StressMaxInWeak) = 4.0
 
 # Dual constraint: a stress trough (an unstressed dip) landing on a strong position — an
 # unfilled beat.
@@ -96,7 +110,7 @@ function violations(::TroughInStrong, p::MetricalParse)
     _, str, pr = _realized(p)
     return count(i -> istrough(pr, i) && str[i] isa Strong, eachindex(pr))
 end
-weight(::TroughInStrong) = 2.0
+_default_weight(::TroughInStrong) = 2.0
 
 # Stress clash: two adjacent primary-stressed syllables.
 struct Clash <: MetricalConstraint end
@@ -125,7 +139,7 @@ function violations(::HeavyInWeak, p::MetricalParse)
     seq, str = _linearize(p)
     return count(i -> str[i] isa Weak && is_heavy(seq[i]), eachindex(seq))
 end
-weight(::HeavyInWeak) = 0.5
+_default_weight(::HeavyInWeak) = 0.5
 
 # Complexity cost: a position holding more than one syllable.
 struct PositionSize <: MetricalConstraint end
@@ -138,7 +152,7 @@ violations(::PositionSize, p::MetricalParse) = count(s -> length(s) > 1, p.slots
 struct IllegalResolution <: MetricalConstraint end
 violations(::IllegalResolution, p::MetricalParse) =
     count(slot -> length(slot) > 1 && !all(_resolvable, slot), p.slots)
-weight(::IllegalResolution) = 10.0
+_default_weight(::IllegalResolution) = 10.0
 
 # Short, stable names for the per-line breakdown (types → Symbol at the edge).
 name(::StressMaxInWeak) = :max_in_weak
@@ -225,10 +239,13 @@ function fit(form::Form, lang::Language, parsed::ParsedPoem)
     if ms !== nothing
         ms.foot !== nothing      && return _metrical_fit(parsed, ms)     # accentual-syllabic (foot-based)
         ms.kind isa Quantitative && return _quantitative_fit(parsed, ms) # quantitative (L/H pattern)
+        ms.kind isa Tonal        && return _tonal_fit(parsed, ms)        # tonal (P/Z pattern)
         return _syllabic_fit(parsed, ms)                                 # syllabic (Romance: count + caesura)
     end
     cs = countspec(form, lang)
     cs !== nothing && return _count_fit(parsed, cs)
+    als = allitspec(form, lang)
+    als !== nothing && return _allit_fit(parsed, als)
     rs = rhymespec(form, lang)
     rs !== nothing && return _rhyme_fit(parsed, rs, lang)
     ss = structurespec(form, lang)

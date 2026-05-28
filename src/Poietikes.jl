@@ -25,14 +25,18 @@ include("languages/japanese.jl")
 include("languages/romance.jl")
 include("languages/lexique.jl")
 include("languages/sanskrit.jl")
+include("languages/chinese.jl")
 include("analysis/features.jl")
 include("analysis/count.jl")
 include("analysis/syllabic.jl")
 include("analysis/quantitative.jl")
+include("analysis/tonal.jl")
 include("analysis/structure.jl")
 include("analysis/rhyme.jl")
+include("analysis/alliteration.jl")
 include("analysis/meter.jl")
 include("analysis/ot.jl")
+include("analysis/scansion.jl")
 include("detection/detect.jl")
 include("analysis/analyze.jl")
 include("scoring/calibrate.jl")
@@ -44,21 +48,21 @@ function __init__()
 end
 
 # Languages
-export Language, English, Japanese, French, Spanish, Italian, Sanskrit
+export Language, English, Japanese, French, Spanish, Italian, Sanskrit, Chinese
 # Forms and variants
-export Form, FreeVerse, Haiku, Tanka, Endecasillabo, Octosilabo, Bhujangaprayata, Sonnet, DataForm
-export SonnetVariant, Shakespearean, Petrarchan
+export Form, FreeVerse, Haiku, Tanka, Endecasillabo, Octosilabo, Bhujangaprayata, Jueju, Alliterative
+export Sonnet, DataForm, SonnetVariant, Shakespearean, Petrarchan
 # Prosodic units
-export ProsodicUnit, Phoneme, Syllable, Mora
+export ProsodicUnit, Phoneme, Syllable, Mora, TonalSyllable
 # Metrical vocabulary
 export Foot, Iamb, Trochee, Anapest, Dactyl, Spondee, Pyrrhic
 export MeterKind, AccentualSyllabic, Syllabic, Quantitative, Tonal
 # Constraint specs
-export CountSpec, MeterSpec, RhymeSpec, StructureSpec
+export CountSpec, MeterSpec, RhymeSpec, StructureSpec, AllitSpec
 # Analysis mode
 export AnalysisMode, Descriptive, Prescriptive
 # Trait functions (extension points: users add methods or @form)
-export countspec, meterspec, rhymespec, structurespec, mode
+export countspec, meterspec, rhymespec, structurespec, allitspec, mode
 # Containment + parse
 export Line, Stanza, ParsedPoem, prosodic_parse
 # Registry / introspection
@@ -69,7 +73,8 @@ export detect_language, detect_form
 export @form, load_forms, formname
 # Scoring
 export ScoreKind, LangConfidence, OTViolations, CountDistance, RawScore, NormScore, normalize_score
-export metrical_costs, calibrate_ot_scale, set_ot_scale!
+export metrical_costs, calibrate_ot_scale, set_ot_scale!, set_freeverse_baseline!
+export set_constraint_weight!, reset_constraint_weights!, learn_constraint_weights
 # G2P
 export G2PBackend, DictBackend, ChainBackend, RuleBackend, CMUDictBackend, LexiqueBackend
 export set_backend!, g2p_backend, pronounce, pronounce_word, phonetic_transcribe
@@ -81,7 +86,7 @@ export StressMaxInWeak, TroughInStrong, Clash, Lapse, HeavyInWeak, PositionSize,
 export best_parse, LineFit, FormFit, fit
 # Analysis
 export AnalysisResult, Unsupported, ProsodicFeatures, features, CountFit, SyllabicFit, QuantitativeFit
-export RhymeFit, StructureFit, rhyme_key
-export Ranked, Candidate, Analysis, best, confidence, is_confident, analyze
+export TonalFit, RhymeFit, StructureFit, AllitFit, rhyme_key
+export Ranked, Candidate, Analysis, best, confidence, is_confident, analyze, scansion
 
 end # module Poietikes

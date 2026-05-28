@@ -2,7 +2,7 @@ using Poietikes
 using Test
 
 # Reach a few non-exported internals for the structural tests.
-using Poietikes: countspec, meterspec, rhymespec, structurespec, mode, combine, register!,
+using Poietikes: countspec, meterspec, rhymespec, structurespec, allitspec, mode, combine, register!,
     _FORMS, _estimate_syllables_english, _parse_cmudict, _morae,
     _french_syllables, _diphthong_nuclei, _ES_VOWELS, _ES_WEAK,
     _iast_weights, _iast_tokens, gana_pattern, _parse_lexique
@@ -82,7 +82,7 @@ end
     @testset "invariant: every prescriptive cell declares ≥1 spec" begin
         for (f, l) in _FORMS
             if mode(f, l) isa Prescriptive
-                specs = (countspec(f, l), meterspec(f, l), rhymespec(f, l), structurespec(f, l))
+                specs = (countspec(f, l), meterspec(f, l), rhymespec(f, l), structurespec(f, l), allitspec(f, l))
                 @test any(!isnothing, specs)
             end
         end
@@ -427,6 +427,32 @@ end
         @test best(analyze("rāma rāma rāma"; language = :sanskrit, form = :bhujangaprayata)).analysis.total_cost > 0
     end
 
+    # ── Tier D: Tang tonal regulated verse (Chinese) ──
+    @testset "Tang tonal (pinyin)" begin
+        line = "shui3 bei4 chun1 feng2 yu3"     # tones 3,4,1,2,3 → Z Z P P Z (the Jueju template)
+        c = best(analyze(line; language = :chinese, form = :jueju))
+        @test c.analysis isa TonalFit
+        @test c.analysis.actual == ["ZZPPZ"]
+        @test c.analysis.total_cost == 0
+        # wrong tones accrue cost
+        @test best(analyze("chun1 feng2 chun1 feng2 chun1"; language = :chinese, form = :jueju)).analysis.total_cost > 0
+        # detection picks Chinese from pinyin-with-tones (syllables chosen to avoid Romance stopword collisions)
+        @test detect_language(line)[1].value isa Chinese
+    end
+
+    # ── Tier D: consonantal axis (alliteration) ──
+    @testset "alliteration (Germanic)" begin
+        # hap·(HH) lit·(L) hat(HH) → two stressed onsets share HH ⇒ meets min 2
+        allit = best(analyze("happy little hat"; language = :english, form = Alliterative())).analysis
+        @test allit isa AllitFit
+        @test allit.per_line == [2]
+        @test allit.total_cost == 0
+        # cat(K) sun(S) warm(W) — no two onsets agree
+        @test best(analyze("cat sun warm"; language = :english, form = Alliterative())).analysis.total_cost > 0
+        # vowel-initial stressed syllables alliterate with each other (key "V")
+        @test Poietikes._allit_key(Syllable([Phoneme("AH1"), Phoneme("N")], 1)) == "V"
+    end
+
     # ── Tier A: rhyme & structure axes ──
     @testset "rhyme fitting (English)" begin
         rhymed = best(analyze("warm cat\nwarm hat"; language = :english, form = Couplet()))
@@ -464,6 +490,22 @@ end
         @test !is_confident(analyze(""); threshold = 0.5)  # empty input: decline
     end
 
+    # ── Scansion strings (human-readable output) ──
+    @testset "scansion rendering" begin
+        m = build_meter(MeterSpec(AccentualSyllabic(), Iamb, 2))
+        syl(s) = Syllable(Phoneme[], s)
+        sc = scansion(MetricalParse(m, [[syl(0)], [syl(1)], [syl(0)], [syl(1)]]))
+        @test occursin("meter", sc) && occursin("+", sc) && occursin("-", sc)
+        # counted form: matching lines marked ✓
+        cf = best(analyze("ふるいけや\nかわずとびこむ\nみずのおと"; language = :japanese, form = :haiku)).analysis
+        @test occursin("✓", scansion(cf))
+        # quantitative form: shows the L/H realization
+        qf = best(analyze("na māyā na māyā na māyā na māyā"; language = :sanskrit, form = :bhujangaprayata)).analysis
+        @test occursin("LHH", scansion(qf))
+        # whole analysis renders to a String
+        @test scansion(analyze(POEM)) isa String
+    end
+
     # ── Tier C: score calibration ──
     @testset "OT score calibration" begin
         @test calibrate_ot_scale([0.0, 0.0], [10.0, 10.0]) == 5.0     # midpoint of the two means
@@ -478,6 +520,27 @@ end
         # metrical_costs returns one weighted cost per line of the fit
         mc = metrical_costs("warm cat sleeps", Sonnet{Shakespearean}(), English())
         @test mc isa Vector{Float64} && length(mc) == 1
+    end
+
+    @testset "tunable weights, baseline, weight learner" begin
+        reset_constraint_weights!()
+        @test weight(StressMaxInWeak()) == 4.0                     # principled default
+        set_constraint_weight!(StressMaxInWeak, 9.0)
+        @test weight(StressMaxInWeak()) == 9.0                     # override applies
+        reset_constraint_weights!()
+        @test weight(StressMaxInWeak()) == 4.0                     # cleared
+
+        learned = learn_constraint_weights(["warm cat sleeps"], ["happy little cat"])
+        @test learned isa Dict && haskey(learned, StressMaxInWeak)
+        @test all(v -> v >= 0, values(learned))                    # weights are non-negative
+
+        old = Poietikes._FREEVERSE_BASELINE[]
+        try
+            set_freeverse_baseline!(0.9)
+            @test Poietikes._FREEVERSE_BASELINE[] == 0.9
+        finally
+            set_freeverse_baseline!(old)
+        end
     end
 
     # ── Tier B: French rhyme via Lexique ──

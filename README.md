@@ -4,7 +4,7 @@ Prosodic analysis in Julia, inspired by Python [prosodic](https://pypi.org/proje
 
 ## Install
 
-poietikês requires **Julia ≥ 1.10**. It is not yet in Julia's General registry, so install it from the repository:
+poietikes requires **Julia ≥ 1.10**. It is not yet in Julia's General registry, so install it from the repository:
 
 ```julia
 using Pkg
@@ -69,7 +69,7 @@ load_forms("myforms.toml")    # register data-defined forms at runtime
 
 ## About
 
-The goal for poeitikes is to retain the metrical-phonological capabilities of prosodic, and extend its capabilities into other defined poetic forms, including those that operate on morae rather than syllables. 
+The goal for poeitikes is to retain the metrical-phonological capabilities of prosodic, and extend its capabilities into a language-aware poetic form analysis.
 
 Poietikes has two pipelines: 
 - prescriptive: given a poetic text, its Form, and its Language, explicitly breaks down the given text in accordance with a Form x Language dispatch, allowing for the same form to be analyzed based on its differences across languages (haiku are analyzed with morae in Japanese and syllables in English). 

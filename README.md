@@ -77,13 +77,7 @@ Poietikes has two pipelines:
 
 Both pipelines are based on analysis of the same prosodic and phonological features, as described in the Methodolgy section. Prosodic parsing is relative to the text language (a parameter in the prescriptive pipeline, or a product of language detection in the descriptive pipeline). 
 
-Currently, this has built-in support for English, Japanese, French, Spanish, Italian, Chinese, and Sanskrit, with pronunciation data from CMUdict for English and Lexique for French. Users are invited to add their own Forms via TOML.
-
-```julia
-struct DataForm <: Form
-    name::Symbol
-    specs::NamedTuple          # carried data, not dispatched methods
-end
+Currently, this has built-in support for English, Japanese, French, Spanish, Italian, Chinese, and Sanskrit, with pronunciation data from CMUdict for English and Lexique for French. 
 ```
 
 ## Methodology

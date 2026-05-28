@@ -4,7 +4,7 @@ Prosodic analysis in Julia, inspired by Python [prosodic](https://pypi.org/proje
 
 ## Install
 
-poietikes requires **Julia ≥ 1.10**. It is not yet in Julia's General registry, so install it from the repository:
+poietikes requires **Julia ≥ 1.10**. It's not in Julia's General registry yet, so install it from the repository:
 
 ```julia
 using Pkg
@@ -45,7 +45,7 @@ analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
         language = :english, form = :haiku)        # CountFit, by Syllable
 ```
 
-**Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will execute some rudimentary detection (TODO: add language detection via LanguageIdentification.jl) for language, and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by [QUESTION: ranked by what?]:
+**Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will execute some rudimentary detection (TODO: add language detection via LanguageIdentification.jl) for language, and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by [EXPLAIN: ranked by what?]:
 
 ```julia
 a = analyze("Shall I compare thee to a summer's day")   # fetches CMUdict on first run
@@ -97,7 +97,7 @@ A form declares constraints on one or more independent **axes**, each a trait fu
 | **tonal** | does the level/oblique sequence match? | Tang regulated verse |
 | **consonantal** | do stressed onsets alliterate? | Germanic alliterative verse |
 
-A form that declares no constraints on any axis, ie, free verse, is treated as having no template and analyzed solely through its features [QUESTION: WHAT FEATURES?].
+A form that declares no constraints on any axis, ie, free verse, is treated as having no template and analyzed solely through its features [EXPLAIN]: WHAT FEATURES?].
 
 ### Metrical parsing as constraint optimization
 
@@ -110,7 +110,7 @@ The accentual-syllabic parser is derived directly from prosodic, and is the most
 
 Two choices follow Hanson & Kiparsky: **monosyllabic words are stress-flexible** — their stress is assigned by the meter, so a function word never fights the template (this is why canonical pentameter scores zero) — and resolution is restricted to light, unstressable syllables. The quantitative and tonal axes reuse the same pattern-matching shape with weight and tone as the per-syllable property; the consonantal axis checks onset agreement among stressed syllables.
 
-[QUESTION: IS THIS JUST FOR ENGLISH? WHAT ABOUT COUNT, METER, QUANTITATIVE, TONAL, AND CONSONANTAL PARSING?]
+[EXPLAIN: WHAT ABOUT COUNT, METER, QUANTITATIVE, TONAL, AND CONSONANTAL PARSING?]
 
 ### Scoring and detection
 

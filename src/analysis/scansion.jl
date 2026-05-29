@@ -1,8 +1,8 @@
 # Human-readable scansion strings (inspired by Python prosodic's output — see docs/comparison.md).
 # `scansion(x)` renders any analysis result as text for inspection: metrical parses show the
 # position template over the realized stress; counted/syllabic/quantitative fits show actuals
-# against targets. This addresses the project_map "Output" open question (structured types vs
-# human-readable scansion) by offering both.
+# against targets. Output is thus available both as structured result types and as
+# human-readable scansion strings.
 
 _pos_glyph(::Strong) = '+'        # strong metrical position (ictus)
 _pos_glyph(::Weak)   = '-'        # weak position
@@ -28,6 +28,11 @@ end
 
 scansion(f::FormFit) = join((scansion(lf) for lf in f.linefits), "\n\n")
 
+function scansion(m::MatraFit)
+    rows = ["  line $i: $(m.actual[i]) mātrās (want $(i <= length(m.expected) ? string(m.expected[i]) : "–"))" for i in eachindex(m.actual)]
+    return "mātrā count (laghu=1, guru=2):\n" * join(rows, "\n")
+end
+
 function scansion(c::CountFit)
     rows = map(eachindex(c.actual)) do i
         want = i <= length(c.expected) ? string(c.expected[i]) : "–"
@@ -44,6 +49,8 @@ function scansion(s::SyllabicFit)
 end
 
 function scansion(q::QuantitativeFit)
+    isempty(q.matched) || return "quantitative (foot search):\n" *
+        join(["  line $i: $(q.actual[i])  (best fit $(q.matched[i]))" for i in eachindex(q.actual)], "\n")
     rows = ["  line $i: $(q.actual[i])" for i in eachindex(q.actual)]
     return "quantitative:\n  target: $(join(q.pattern))\n" * join(rows, "\n")
 end

@@ -3,8 +3,8 @@
 # A single Float64 everywhere would presuppose that language-ID confidence and OT form-fit
 # live on a common scale; they do not (different ranges, opposite directions). So raw scores
 # keep their kind and direction, and only NormScore — higher-better, in [0,1] — is ever
-# ranked. The actual calibration (the normalize/combine maps) is tracked deferred work (see
-# project_map.md → Score calibration); these are deliberate placeholders.
+# ranked. The actual calibration (the normalize/combine maps) is tracked deferred work; the
+# current maps are deliberate placeholders.
 
 abstract type ScoreKind end
 struct LangConfidence <: ScoreKind end      # ∈ [0,1], higher better

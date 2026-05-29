@@ -13,6 +13,10 @@ struct Spanish  <: Language end
 struct Italian  <: Language end
 struct Sanskrit <: Language end
 struct Chinese  <: Language end
+struct Latin    <: Language end
+struct Arabic   <: Language end
+struct Norse    <: Language end
+struct Welsh    <: Language end
 
 # ── Forms ─────────────────────────────────────────────────────────────────────
 # A {Variant} type parameter expresses named flavors sharing a name within ONE tradition
@@ -31,6 +35,11 @@ struct Octosilabo     <: Form end         # Spanish octosyllable: 8 metrical syl
 struct Bhujangaprayata <: Form end        # Sanskrit quantitative metre: four ya-gaṇas (L H H)×4
 struct Jueju <: Form end                  # Tang regulated quatrain: per-line tonal template
 struct Alliterative <: Form end           # Germanic alliterative verse: stressed onsets agree
+struct Hexameter <: Form end              # Greek/Latin dactylic hexameter: six feet, dactyl⇄spondee
+struct Tawil <: Form end                  # Arabic al-Ṭawīl: faʿūlun mafāʿīlun ×2 (with ziḥāf)
+struct Kamil <: Form end                  # Arabic al-Kāmil: mutafāʿilun ×3 (with iḍmār)
+struct Drottkvaett <: Form end            # Old Norse court metre: 6-syll lines, line-pair alliteration + hending
+struct Cywydd <: Form end                 # Welsh: 7-syll lines with cynghanedd (consonant-sequence harmony)
 struct Sonnet{V<:SonnetVariant} <: Form end
 
 # Data-driven forms: a single type carrying its specs as runtime data (the non-programmer
@@ -97,10 +106,12 @@ struct MeterSpec
     caesura::Union{Int,Nothing}         # syllable after which a word boundary is required (e.g. 6)
     accents::Vector{Int}                # syllable positions that must bear a word-accent (e.g. [6,12])
     pattern::Vector{Char}               # per-position weight target for quantitative metre ('L'/'H'/'.')
-end
-MeterSpec(kind::MeterKind, foot, len) = MeterSpec(kind, foot, len, nothing, Int[], Char[])
-MeterSpec(kind::MeterKind, foot, len, caesura) = MeterSpec(kind, foot, len, caesura, Int[], Char[])
-MeterSpec(kind::MeterKind, foot, len, caesura, accents) = MeterSpec(kind, foot, len, caesura, accents, Char[])
+    feet::Vector{Vector{String}}        # quantitative foot alternatives: each foot's allowed L/H realizations
+end                                     #   (e.g. dactyl⇄spondee); empty ⇒ use the fixed `pattern`
+MeterSpec(kind::MeterKind, foot, len) = MeterSpec(kind, foot, len, nothing, Int[], Char[], Vector{String}[])
+MeterSpec(kind::MeterKind, foot, len, caesura) = MeterSpec(kind, foot, len, caesura, Int[], Char[], Vector{String}[])
+MeterSpec(kind::MeterKind, foot, len, caesura, accents) = MeterSpec(kind, foot, len, caesura, accents, Char[], Vector{String}[])
+MeterSpec(kind::MeterKind, foot, len, caesura, accents, pattern) = MeterSpec(kind, foot, len, caesura, accents, pattern, Vector{String}[])
 
 struct RhymeSpec
     scheme::String                  # e.g. "ababcdcdefefgg"
@@ -114,6 +125,10 @@ end
 
 struct AllitSpec
     min::Int                # minimum stressed syllables per line that must share an onset
+end
+
+struct MatraSpec
+    counts::Vector{Int}     # target morae (mātrās) per line — laghu = 1, guru = 2
 end
 
 # ── Analysis mode: descriptive vs prescriptive is DECLARED, not inferred ────────

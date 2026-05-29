@@ -36,7 +36,8 @@ function _iast_tokens(s::AbstractString)
         elseif isletter(c)
             push!(toks, (:cons, false)); i += 1
         else
-            i += 1                                                    # space / punctuation
+            isspace(c) && push!(toks, (:boundary, false))             # word break (for yati)
+            i += 1
         end
     end
     return toks
@@ -60,14 +61,76 @@ function _iast_weights(toks)
     return weights
 end
 
+# Word-final flag per syllable (one per vowel), from a token stream carrying :boundary markers
+# at word breaks: a syllable ends its word if a boundary falls before the next vowel (codas
+# between the vowel and the break belong to this syllable), or it is the line's last syllable.
+# This is what yati (the quantitative caesura) tests — the L/H analog of the Romance caesura.
+function _word_final_flags(toks)
+    vpos = [i for (i, t) in enumerate(toks) if t[1] === :vowel]
+    flags = Bool[]
+    for (k, vi) in enumerate(vpos)
+        stop = k < length(vpos) ? vpos[k+1] : length(toks) + 1
+        push!(flags, k == length(vpos) || any(t -> t[1] === :boundary, @view toks[vi+1:stop-1]))
+    end
+    return flags
+end
+
+# Devanāgarī → the same token stream the IAST weigher consumes, so guru/laghu is reused untouched.
+# A consonant carries an inherent short 'a' unless followed by a vowel sign, a virāma (it joins a
+# cluster), or another consonant; signs and independent vowels carry their own long/short value.
+const _DEVA_VOWEL_IND_LONG  = Set("आईऊॠॡएऐओऔ")
+const _DEVA_VOWEL_IND_SHORT = Set("अइउऋऌ")
+const _DEVA_SIGN_LONG  = Set("ाीूॄेैोौॣ")
+const _DEVA_SIGN_SHORT = Set("िुृॢ")
+_deva_consonant(c::Char) = 'क' <= c <= 'ह'                     # U+0915–U+0939
+
+function _devanagari_tokens(text::AbstractString)
+    cs = collect(text)
+    toks = Tuple{Symbol,Bool}[]
+    i, n = 1, length(cs)
+    while i <= n
+        c = cs[i]
+        if c in _DEVA_VOWEL_IND_LONG
+            push!(toks, (:vowel, true)); i += 1
+        elseif c in _DEVA_VOWEL_IND_SHORT
+            push!(toks, (:vowel, false)); i += 1
+        elseif _deva_consonant(c)
+            push!(toks, (:cons, false))
+            nxt = i < n ? cs[i+1] : ' '
+            if nxt in _DEVA_SIGN_LONG
+                push!(toks, (:vowel, true)); i += 2
+            elseif nxt in _DEVA_SIGN_SHORT
+                push!(toks, (:vowel, false)); i += 2
+            elseif nxt == '्'                                  # virāma: cluster, no vowel
+                i += 2
+            else
+                push!(toks, (:vowel, false)); i += 1            # inherent short 'a'
+            end
+        elseif c == 'ं' || c == 'ँ'
+            push!(toks, (:anusvara, false)); i += 1
+        elseif c == 'ः'
+            push!(toks, (:visarga, false)); i += 1
+        else
+            isspace(c) && push!(toks, (:boundary, false))       # word break (for yati)
+            i += 1                                              # daṇḍa, digit, …
+        end
+    end
+    return toks
+end
+
+# Accept either script: Devanāgarī if present, else IAST.
+_sanskrit_tokens(s::AbstractString) =
+    any(c -> 'ऀ' <= c <= 'ॿ', s) ? _devanagari_tokens(s) : _iast_tokens(s)
+
 function prosodic_parse(text::AbstractString, lang::Sanskrit)
     stanzas = Stanza[]
     for block in _split_stanzas(text)
         ls = Line[]
         for ln in split(block, '\n')
             isempty(strip(ln)) && continue
-            w = _iast_weights(_iast_tokens(ln))
-            units = ProsodicUnit[Syllable(Phoneme[], 0, false, false, h) for h in w]
+            toks = _sanskrit_tokens(ln)
+            w, wf = _iast_weights(toks), _word_final_flags(toks)
+            units = ProsodicUnit[Syllable(Phoneme[], 0, false, wf[i], w[i]) for i in eachindex(w)]
             push!(ls, Line(units, String(strip(ln))))
         end
         isempty(ls) || push!(stanzas, Stanza(ls))

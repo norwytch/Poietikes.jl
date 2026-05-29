@@ -15,7 +15,8 @@ const _AXIS = Dict(:count     => (:CountSpec, :countspec),
                    :meter     => (:MeterSpec, :meterspec),
                    :rhyme     => (:RhymeSpec, :rhymespec),
                    :structure => (:StructureSpec, :structurespec),
-                   :allit     => (:AllitSpec, :allitspec))
+                   :allit     => (:AllitSpec, :allitspec),
+                   :matra     => (:MatraSpec, :matraspec))
 
 """
     @form Name Language begin
@@ -69,8 +70,10 @@ function _meterspec_from_toml(m)
               haskey(m, "foot") ? _resolve_foot(m["foot"]) : nothing,
               haskey(m, "len") ? Int(m["len"]) : nothing,
               haskey(m, "caesura") ? Int(m["caesura"]) : nothing,
-              haskey(m, "accents") ? Vector{Int}(m["accents"]) : Int[])
-end
+              haskey(m, "accents") ? Vector{Int}(m["accents"]) : Int[],
+              haskey(m, "pattern") ? collect(String(m["pattern"])) : Char[],      # fixed L/H/. pattern
+              haskey(m, "feet") ? Vector{String}[Vector{String}(f) for f in m["feet"]] : Vector{String}[])
+end                                                                               # foot alternatives
 
 function _specs_from_toml(spec)
     p = Pair{Symbol,Any}[]

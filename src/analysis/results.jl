@@ -24,8 +24,8 @@ end
 """
     best(analysis) -> Candidate
 
-The top-ranked candidate. (Note: still a single verdict — a confidence floor is an open
-design question; see project_map.md.)
+The top-ranked candidate. (Note: still a single verdict — a confidence floor is a deferred
+design question.)
 """
 best(a::Analysis) = first(a.candidates)
 

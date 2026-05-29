@@ -238,12 +238,17 @@ function fit(form::Form, lang::Language, parsed::ParsedPoem)
     ms = meterspec(form, lang)
     if ms !== nothing
         ms.foot !== nothing      && return _metrical_fit(parsed, ms)     # accentual-syllabic (foot-based)
-        ms.kind isa Quantitative && return _quantitative_fit(parsed, ms) # quantitative (L/H pattern)
+        if ms.kind isa Quantitative                                      # quantitative (L/H)
+            return isempty(ms.feet) ? _quantitative_fit(parsed, ms) :    #   fixed pattern (Sanskrit)
+                                      _quantitative_search(parsed, ms)   #   foot alternatives (Greek/Latin)
+        end
         ms.kind isa Tonal        && return _tonal_fit(parsed, ms)        # tonal (P/Z pattern)
         return _syllabic_fit(parsed, ms)                                 # syllabic (Romance: count + caesura)
     end
     cs = countspec(form, lang)
     cs !== nothing && return _count_fit(parsed, cs)
+    mts = matraspec(form, lang)
+    mts !== nothing && return _matra_fit(parsed, mts)
     als = allitspec(form, lang)
     als !== nothing && return _allit_fit(parsed, als)
     rs = rhymespec(form, lang)

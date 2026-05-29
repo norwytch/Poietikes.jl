@@ -1,0 +1,19 @@
+name = "Poietikes"
+uuid = "09fca1fe-24f1-4998-9231-7de1d0d75c53"
+version = "0.1.0"
+authors = ["Julia Quinn"]
+
+[deps]
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+
+[compat]
+Downloads = "1.7.0"
+TOML = "1.0.3"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

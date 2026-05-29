@@ -12,6 +12,10 @@ function _resolve_language(s::Symbol)
     s === :italian  && return Italian()
     s === :sanskrit && return Sanskrit()
     s === :chinese  && return Chinese()
+    s === :latin    && return Latin()
+    s === :arabic   && return Arabic()
+    s === :norse    && return Norse()
+    s === :welsh    && return Welsh()
     error("unknown language :$s")
 end
 
@@ -25,6 +29,11 @@ function _resolve_form(s::Symbol)
     s === :bhujangaprayata && return Bhujangaprayata()
     s === :jueju  && return Jueju()
     s === :alliterative && return Alliterative()
+    s === :hexameter && return Hexameter()
+    s === :tawil && return Tawil()
+    s === :kamil && return Kamil()
+    s === :drottkvaett && return Drottkvaett()
+    s === :cywydd && return Cywydd()
     s === :sonnet && return Sonnet{Shakespearean}()
     error("unknown form :$s")
 end
@@ -48,7 +57,7 @@ _form_candidates(form, lang) = form === :auto ? supported_forms(lang) : [_resolv
 Analyze `text`, returning ranked candidates best-first. With `:auto`, language and form are
 detected; the score combines language confidence with form fit. With an explicit language
 and/or form, that axis is fixed and the score is the pure fit. `best(analysis)` is the top
-candidate (still a single verdict — see the confidence-floor open question in project_map.md).
+candidate (still a single verdict — a confidence floor remains a deferred design question).
 """
 function analyze(text::AbstractString; language = :auto, form = :auto)
     out = Candidate[]
@@ -56,7 +65,9 @@ function analyze(text::AbstractString; language = :auto, form = :auto)
         lang   = lr.value
         parsed = prosodic_parse(text, lang)
         for f in _form_candidates(form, lang)
-            analysis = supports(f, lang) ? _analyze_form(f, lang, parsed) : Unsupported()
+            # A form not defined for this language has no template here, so it is analyzed
+            # descriptively — as if it declared no constraints (features only), not refused.
+            analysis = supports(f, lang) ? _analyze_form(f, lang, parsed) : features(parsed)
             fit_score = _score_analysis(analysis)
             score = language === :auto ? combine(lr.score, fit_score) : fit_score
             push!(out, Candidate(lang, f, analysis, parsed, score))

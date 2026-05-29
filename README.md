@@ -15,6 +15,8 @@ Pkg.develop(path = "/path/to/poietikes")
 
 Pronunciation data is downloaded and cached on first use — [CMUdict](https://github.com/cmusphinx/cmudict) for English, [Lexique](http://www.lexique.org) for French. Japanese, Romance, Sanskrit, and Chinese currently use rule-based frontends and need no download.
 
+Why a dictionary rather than a grapheme-to-phoneme engine like espeak? English stress and French rhyme are *lexical* — they can't be derived from spelling by rule — so a curated dictionary is the right tool, and a rule-based G2P mishandles the irregular cases. The same holds for Japanese **kanji** and Chinese **hanzi**: a logograph carries no reliable pronunciation, so those readings need a dictionary too. That is precisely why the Japanese and Chinese frontends currently take *phonetic* input (kana and pinyin) and treat raw kanji/hanzi as a known limitation — the rule-based path works only where the script is (largely) phonemic: kana, pinyin, IAST, and Romance orthography. As for the dependency: CMUdict and Lexique are redistributable data files (fetched once, cached, parsed in pure Julia), not a native binary like espeak; and G2P is a pluggable backend — a dictionary by default, a rule-based fallback for unknown words, and room for an espeak or neural backend later — so nothing is locked in.
+
 ## Quickstart
 
 ```julia
@@ -45,7 +47,7 @@ analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
         language = :english, form = :haiku)        # CountFit, by Syllable
 ```
 
-**Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will execute some rudimentary detection (TODO: add language detection via LanguageIdentification.jl) for language, and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by [EXPLAIN: ranked by what?]:
+**Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will execute some rudimentary detection (TODO: add language detection via LanguageIdentification.jl) for language, and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by `NormScore` [0,1], in which 1 is a perfect fit to the form (a constrained form must clear a ~0.6 baseline to be ranked above free verse; `is_confident` separately flags a top candidate that falls below a low floor).
 
 ```julia
 a = analyze("Shall I compare thee to a summer's day")   # fetches CMUdict on first run
@@ -66,8 +68,6 @@ end
 
 load_forms("myforms.toml")    # register data-defined forms at runtime
 ```
-
-## About
 
 ## Methodology
 
@@ -97,7 +97,7 @@ A form declares constraints on one or more independent **axes**, each a trait fu
 | **tonal** | does the level/oblique sequence match? | Tang regulated verse |
 | **consonantal** | do stressed onsets alliterate? | Germanic alliterative verse |
 
-A form that declares no constraints on any axis, ie, free verse, is treated as having no template and analyzed solely through its features [EXPLAIN]: WHAT FEATURES?].
+A form that declares no constraints on any axis, ie, free verse, is treated as having no template and analyzed solely through its prosodic features: stanza and line counts, the number of units (syllables or morae) per line, the total syllable count, and the per-line stress profile. This is also the fallback when a form isn't defined for a given language — it is analyzed as if it had no template, rather than refused. 
 
 ### Metrical parsing as constraint optimization
 
@@ -110,7 +110,7 @@ The accentual-syllabic parser is derived directly from prosodic, and is the most
 
 Two choices follow Hanson & Kiparsky: **monosyllabic words are stress-flexible** — their stress is assigned by the meter, so a function word never fights the template (this is why canonical pentameter scores zero) — and resolution is restricted to light, unstressable syllables. The quantitative and tonal axes reuse the same pattern-matching shape with weight and tone as the per-syllable property; the consonantal axis checks onset agreement among stressed syllables.
 
-[EXPLAIN: WHAT ABOUT COUNT, METER, QUANTITATIVE, TONAL, AND CONSONANTAL PARSING?]
+The other axes need no such search — meter is the only one where syllables can align to positions in more than one way, so only it requires optimization. The rest are direct per-line comparisons: **count** tallies the units in each line against the target (e.g. 5-7-5); **syllabic** checks that count plus the caesura and accent positions; **quantitative** and **tonal** compare the line's light/heavy or level/oblique sequence to a target pattern, position by position; **consonantal** counts how many of a line's stressed syllables share an onset; and **rhyme** and **structure** compare realized rimes and line/stanza counts to what the form declares. They are accordingly short, near-identical `_*_fit` functions — the meter parser above is the outlier.
 
 ### Scoring and detection
 

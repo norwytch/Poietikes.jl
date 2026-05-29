@@ -2,7 +2,7 @@ using Poietikes
 using Test
 
 # Reach a few non-exported internals for the structural tests.
-using Poietikes: countspec, meterspec, rhymespec, structurespec, allitspec, mode, combine, register!,
+using Poietikes: countspec, meterspec, rhymespec, structurespec, allitspec, matraspec, mode, combine, register!,
     _FORMS, _estimate_syllables_english, _parse_cmudict, _morae,
     _french_syllables, _diphthong_nuclei, _ES_VOWELS, _ES_WEAK,
     _iast_weights, _iast_tokens, gana_pattern, _parse_lexique
@@ -47,6 +47,25 @@ end
     rhyme = ("aa", false)
 end
 
+# Tier D: a Sanskrit mātrā (moraic) meter — 8 mātrās per line (also exercises @form's matra axis).
+@form MatraPada Sanskrit begin
+    matra = ([8],)
+end
+
+# Tier D: a quantitative metre with yati (caesura) after the 4th syllable — exercises the
+# word-boundary check on the L/H axis (pattern L H × 4, word break required mid-line).
+@form YatiPada Sanskrit begin
+    meter = (Quantitative(), nothing, 8, 4, Int[], collect("LHLHLHLH"))
+end
+
+# Tier D: a strict 4-syllable quantitative metre and its anceps variant (final position '.').
+@form StrictPada Sanskrit begin
+    meter = (Quantitative(), nothing, 4, nothing, Int[], collect("LHLH"))
+end
+@form AncepsPada Sanskrit begin
+    meter = (Quantitative(), nothing, 4, nothing, Int[], Poietikes.final_anceps("LHLH"))
+end
+
 @testset "Poietikes" begin
 
     @testset "registry: defined cells, undefined cells, introspection" begin
@@ -82,7 +101,8 @@ end
     @testset "invariant: every prescriptive cell declares ≥1 spec" begin
         for (f, l) in _FORMS
             if mode(f, l) isa Prescriptive
-                specs = (countspec(f, l), meterspec(f, l), rhymespec(f, l), structurespec(f, l), allitspec(f, l))
+                specs = (countspec(f, l), meterspec(f, l), rhymespec(f, l),
+                         structurespec(f, l), allitspec(f, l), matraspec(f, l))
                 @test any(!isnothing, specs)
             end
         end
@@ -403,6 +423,29 @@ end
         @test_throws ErrorException load_forms(bad)
     end
 
+    @testset "load_forms: quantitative pattern + feet" begin
+        toml = """
+        [tomlpada]
+        language = "sanskrit"
+        meter = { kind = "quantitative", len = 4, pattern = "LHLH" }
+
+        [tomlhex]
+        language = "latin"
+        meter = { kind = "quantitative", feet = [["HLL", "HH"], ["HLL", "HH"], ["HLL", "HH"], ["HLL", "HH"], ["HLL", "HH"], ["HH", "HL"]] }
+        """
+        path = tempname() * ".toml"
+        write(path, toml)
+        load_forms(path)
+        # fixed pattern from TOML (Sanskrit)
+        pada = only(f for f in supported_forms(Sanskrit()) if f isa DataForm && f.name == :tomlpada)
+        @test meterspec(pada, Sanskrit()).pattern == collect("LHLH")
+        @test best(analyze("ramā ramā"; language = :sanskrit, form = pada)).analysis.total_cost == 0
+        # foot alternatives from TOML (Latin) — same Aeneid line scans cleanly through the search
+        hex = only(f for f in supported_forms(Latin()) if f isa DataForm && f.name == :tomlhex)
+        @test length(meterspec(hex, Latin()).feet) == 6
+        @test best(analyze("arma virumque canō Trōiae quī prīmus ab ōrīs"; language = :latin, form = hex)).analysis.total_cost == 0
+    end
+
     # ── Phase 7: quantitative metre (Sanskrit) ──
     wstr(line) = String([h ? 'H' : 'L' for h in _iast_weights(_iast_tokens(line))])
 
@@ -427,6 +470,26 @@ end
         @test best(analyze("rāma rāma rāma"; language = :sanskrit, form = :bhujangaprayata)).analysis.total_cost > 0
     end
 
+    @testset "Sanskrit Devanāgarī input" begin
+        dvg(s) = String([h ? 'H' : 'L' for h in _iast_weights(Poietikes._sanskrit_tokens(s))])
+        @test dvg("कमल")   == "LLL"     # ka·ma·la — all short, open
+        @test dvg("गङ्गा") == "HH"      # gaṅ (cluster) · gā (long)
+        @test dvg("रामः")  == "HH"      # rā (long) · maḥ (visarga)
+        # the same Bhujaṅgaprayāta scans identically whether given in Devanāgarī or IAST
+        c = best(analyze("न माया न माया न माया न माया"; language = :sanskrit, form = :bhujangaprayata))
+        @test c.analysis.actual == ["LHHLHHLHHLHH"]
+        @test c.analysis.total_cost == 0
+    end
+
+    @testset "mātrā (moraic) meter" begin
+        c = best(analyze("rāmā rāmā"; language = :sanskrit, form = MatraPada()))
+        @test c.analysis isa MatraFit
+        @test c.analysis.actual == [8]          # rā·mā·rā·mā — four guru × 2 = 8 mātrās
+        @test c.analysis.total_distance == 0
+        # laghu syllables count 1: rā(2)·ma(1)·rā(2)·ma(1) = 6, two short of the target
+        @test best(analyze("rāma rāma"; language = :sanskrit, form = MatraPada())).analysis.actual == [6]
+    end
+
     # ── Tier D: Tang tonal regulated verse (Chinese) ──
     @testset "Tang tonal (pinyin)" begin
         line = "shui3 bei4 chun1 feng2 yu3"     # tones 3,4,1,2,3 → Z Z P P Z (the Jueju template)
@@ -438,6 +501,106 @@ end
         @test best(analyze("chun1 feng2 chun1 feng2 chun1"; language = :chinese, form = :jueju)).analysis.total_cost > 0
         # detection picks Chinese from pinyin-with-tones (syllables chosen to avoid Romance stopword collisions)
         @test detect_language(line)[1].value isa Chinese
+    end
+
+    # ── Tier D: Greek/Latin foot-alternative quantitative metre (dactylic hexameter) ──
+    @testset "Latin dactylic hexameter" begin
+        # Each of the first five feet is independently a dactyl (— ∪∪) or spondee (— —); the
+        # search finds the realization matching the line. Aeneid 1.1 = D D S S D S.
+        aen = best(analyze("arma virumque canō Trōiae quī prīmus ab ōrīs"; language = :latin, form = :hexameter))
+        @test aen.analysis isa QuantitativeFit
+        @test aen.analysis.actual == ["HLLHLLHHHHHLLHH"]
+        @test aen.analysis.matched == ["HLLHLLHHHHHLLHH"]      # the winning foot pattern
+        @test aen.analysis.total_cost == 0
+        # A different foot mix (D D D S D S) must also scan cleanly — proves substitution search.
+        ecl = best(analyze("Tītyre tū patulae recubāns sub tegmine fāgī"; language = :latin, form = :hexameter))
+        @test ecl.analysis.actual == ["HLLHLLHLLHHHLLHH"]
+        @test ecl.analysis.total_cost == 0
+        # Consonantal i: Trōiae scans Trō-jae (4 weights H H here), not Trō-i-ae.
+        @test Poietikes._iast_weights(Poietikes._latin_tokens("Trōiae")) == [true, true]
+        # Non-hexameter text accrues cost.
+        @test best(analyze("the cat sat on the mat and ran"; language = :latin, form = :hexameter)).analysis.total_cost > 0
+        @test Hexameter() in supported_forms(Latin())
+    end
+
+    # ── Tier D: yati (quantitative caesura) — a required word boundary on the L/H axis ──
+    @testset "yati (quantitative caesura)" begin
+        # Both lines realize the same pattern L H L H L H L H; they differ only in word breaks.
+        ok = best(analyze("ramā ramā ramā ramā"; language = :sanskrit, form = YatiPada()))
+        @test ok.analysis isa QuantitativeFit
+        @test ok.analysis.actual == ["LHLHLHLH"]
+        @test ok.analysis.total_cost == 0                  # word break falls after syllable 4 ⇒ yati met
+        # same weights, but no word boundary at syllable 4 ⇒ one yati violation, pattern still clean
+        miss = best(analyze("ramā ramāramā ramā"; language = :sanskrit, form = YatiPada()))
+        @test miss.analysis.actual == ["LHLHLHLH"]
+        @test miss.analysis.total_cost == 1
+    end
+
+    # ── Tier D: line-final anceps (brevis in longo) via the wildcard helper ──
+    @testset "final anceps" begin
+        @test Poietikes.final_anceps("LHHLHHLHHLHH") == collect("LHHLHHLHHLH.")
+        # a metre whose final position is anceps accepts either weight there; the strict one does not
+        @test best(analyze("ramā rama"; language = :sanskrit, form = AncepsPada())).analysis.total_cost == 0
+        @test best(analyze("ramā rama"; language = :sanskrit, form = StrictPada())).analysis.total_cost == 1
+        @test best(analyze("ramā ramā"; language = :sanskrit, form = StrictPada())).analysis.total_cost == 0
+    end
+
+    # ── Tier D: Arabic al-Khalīl (buḥūr via the foot-alternative search; ziḥāf = foot variants) ──
+    @testset "Arabic buḥūr (Ṭawīl, Kāmil)" begin
+        # CV → light, CVV/CVC → heavy, same rules as Latin/Sanskrit
+        wt(s) = String([h ? 'H' : 'L' for h in Poietikes._iast_weights(Poietikes._arabic_tokens(s))])
+        @test wt("faʿūlun") == "LHH"          # fa(L) ʿū(H) lun(H)
+        @test wt("mafāʿīlun") == "LHHH"
+        @test wt("mutafāʿilun") == "LLHLH"    # the two opening shorts (contracted by iḍmār)
+        # al-Ṭawīl: Imruʾ al-Qais's muʿallaqa opening hemistich scans cleanly (faʿūlun mafāʿīlun
+        # faʿūlun mafāʿilun, the last foot anceps at the bayt end).
+        tawil = best(analyze("qifā nabki min dhikrā ḥabībin wa manzili"; language = :arabic, form = :tawil))
+        @test tawil.analysis isa QuantitativeFit
+        @test tawil.analysis.actual == ["LHHLHHHLHHLHLL"]
+        @test tawil.analysis.total_cost == 0
+        # al-Kāmil: mutafāʿilun ×3 (base form)
+        @test best(analyze("mutafāʿilun mutafāʿilun mutafāʿilun"; language = :arabic, form = :kamil)).analysis.total_cost == 0
+        # iḍmār: a foot may contract L L H L H → H H L H (a *different-length* alternative the search picks)
+        @test best(analyze("mustafʿilun mutafāʿilun mutafāʿilun"; language = :arabic, form = :kamil)).analysis.total_cost == 0
+        # non-verse text accrues cost
+        @test best(analyze("the cat sat on a mat"; language = :arabic, form = :tawil)).analysis.total_cost > 0
+        @test Tawil() in supported_forms(Arabic())
+    end
+
+    # ── Tier D: Old Norse dróttkvætt — composite fit (count + line-pair allit + internal hending) ──
+    @testset "Old Norse dróttkvætt" begin
+        # couplet satisfying all three: 6 syllables/line; höfuðstafr f with two stuðlar on f;
+        # skothending fold/vald (coda ld, differing vowel); aðalhending borg/sorg (rime org).
+        good = "fold renn vald um fang gramr\nfagr ok borg við sorg renn"
+        d = best(analyze(good; language = :norse, form = :drottkvaett)).analysis
+        @test d isa DrottkvaettFit
+        @test d.syllables == [6, 6]
+        @test d.allit_cost == 0
+        @test d.hending_cost == 0
+        @test d.total_cost == 0
+        # break the head-stave (even line opens on b; odd line carries no b-lift) → alliteration miss
+        bad = best(analyze("fold renn vald um fang gramr\nbragr ok borg við sorg renn"; language = :norse, form = :drottkvaett)).analysis
+        @test bad.allit_cost == 2
+        # a five-syllable line costs on count
+        short = best(analyze("fold renn vald um fang\nfagr ok borg við sorg renn"; language = :norse, form = :drottkvaett)).analysis
+        @test short.count_cost == 1
+        # s+stop alliterates only as the cluster (st), bare vowels share the key "V"
+        @test Poietikes._norse_onset_key(only(Poietikes._norse_syllables("stein"))) == "st"
+        @test Poietikes._norse_onset_key(only(Poietikes._norse_syllables("ól"))) == "V"
+        @test Drottkvaett() in supported_forms(Norse())
+    end
+
+    # ── Tier D: Welsh cynghanedd — consonant-sequence harmony (groes) ──
+    @testset "Welsh cynghanedd (groes)" begin
+        # Welsh digraphs are single consonants
+        @test Poietikes._welsh_cons_seq("llawn dda") == ["ll", "n", "dd"]
+        # the two halves answer consonant-for-consonant: cana ef → [c,n,f] = cana fi → [c,n,f]
+        harm = best(analyze("cana ef cana fi"; language = :welsh, form = :cywydd)).analysis
+        @test harm isa CynghaneddFit
+        @test harm.harmony_cost == 0
+        # no split yields matching consonant sequences
+        @test best(analyze("mab aeth allan heddiw"; language = :welsh, form = :cywydd)).analysis.harmony_cost == 1
+        @test Cywydd() in supported_forms(Welsh())
     end
 
     # ── Tier D: consonantal axis (alliteration) ──
@@ -576,6 +739,13 @@ end
         rigid  = ParsedPoem(Spanish(), [Stanza([Line(syls, "x", 0)])], "x")
         @test Poietikes._syllabic_fit(flexed, spec).total_cost == 0   # 8 reachable in [7, 8]
         @test Poietikes._syllabic_fit(rigid,  spec).total_cost == 1   # stuck at 7
+    end
+
+    @testset "undefined (form, language) → descriptive, not refused" begin
+        # Sonnet isn't defined for Japanese; analyze it as if it had no template (features only)
+        a = best(analyze("ふるいけや\nかわずとびこむ\nみずのおと"; language = :japanese, form = :sonnet))
+        @test !supports(Sonnet{Shakespearean}(), Japanese())
+        @test a.analysis isa ProsodicFeatures
     end
 
 end

@@ -1,7 +1,7 @@
 """
     Poietikes
 
-A form-aware, multilingual prosodic analysis library. See `project_map.md` for the design.
+A form-aware, multilingual prosodic analysis library. See `README.md` for the design and methodology.
 
 Phase 1: the (Form × Language) type architecture, the spec/trait system, the form registry,
 the scoring currency, English G2P (CMUdict + rule fallback), syllabification, and free-verse
@@ -11,6 +11,8 @@ module Poietikes
 
 using Downloads
 using TOML
+import Languages                       # qualified: its English/French/… types collide with ours
+using Logging: with_logger, NullLogger
 
 include("core/types.jl")
 include("core/traits.jl")
@@ -26,6 +28,10 @@ include("languages/romance.jl")
 include("languages/lexique.jl")
 include("languages/sanskrit.jl")
 include("languages/chinese.jl")
+include("languages/latin.jl")
+include("languages/arabic.jl")
+include("languages/norse.jl")
+include("languages/welsh.jl")
 include("analysis/features.jl")
 include("analysis/count.jl")
 include("analysis/syllabic.jl")
@@ -34,10 +40,13 @@ include("analysis/tonal.jl")
 include("analysis/structure.jl")
 include("analysis/rhyme.jl")
 include("analysis/alliteration.jl")
+include("analysis/matra.jl")
 include("analysis/meter.jl")
 include("analysis/ot.jl")
 include("analysis/scansion.jl")
 include("detection/detect.jl")
+include("analysis/drottkvaett.jl")
+include("analysis/cynghanedd.jl")
 include("analysis/analyze.jl")
 include("scoring/calibrate.jl")
 include("dsl/dsl.jl")
@@ -48,9 +57,10 @@ function __init__()
 end
 
 # Languages
-export Language, English, Japanese, French, Spanish, Italian, Sanskrit, Chinese
+export Language, English, Japanese, French, Spanish, Italian, Sanskrit, Chinese, Latin, Arabic, Norse, Welsh
 # Forms and variants
 export Form, FreeVerse, Haiku, Tanka, Endecasillabo, Octosilabo, Bhujangaprayata, Jueju, Alliterative
+export Hexameter, Tawil, Kamil, Drottkvaett, Cywydd
 export Sonnet, DataForm, SonnetVariant, Shakespearean, Petrarchan
 # Prosodic units
 export ProsodicUnit, Phoneme, Syllable, Mora, TonalSyllable
@@ -58,11 +68,11 @@ export ProsodicUnit, Phoneme, Syllable, Mora, TonalSyllable
 export Foot, Iamb, Trochee, Anapest, Dactyl, Spondee, Pyrrhic
 export MeterKind, AccentualSyllabic, Syllabic, Quantitative, Tonal
 # Constraint specs
-export CountSpec, MeterSpec, RhymeSpec, StructureSpec, AllitSpec
+export CountSpec, MeterSpec, RhymeSpec, StructureSpec, AllitSpec, MatraSpec
 # Analysis mode
 export AnalysisMode, Descriptive, Prescriptive
 # Trait functions (extension points: users add methods or @form)
-export countspec, meterspec, rhymespec, structurespec, allitspec, mode
+export countspec, meterspec, rhymespec, structurespec, allitspec, matraspec, mode
 # Containment + parse
 export Line, Stanza, ParsedPoem, prosodic_parse
 # Registry / introspection
@@ -86,7 +96,7 @@ export StressMaxInWeak, TroughInStrong, Clash, Lapse, HeavyInWeak, PositionSize,
 export best_parse, LineFit, FormFit, fit
 # Analysis
 export AnalysisResult, Unsupported, ProsodicFeatures, features, CountFit, SyllabicFit, QuantitativeFit
-export TonalFit, RhymeFit, StructureFit, AllitFit, rhyme_key
+export TonalFit, RhymeFit, StructureFit, AllitFit, MatraFit, DrottkvaettFit, CynghaneddFit, rhyme_key
 export Ranked, Candidate, Analysis, best, confidence, is_confident, analyze, scansion
 
 end # module Poietikes

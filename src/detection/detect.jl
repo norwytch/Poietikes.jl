@@ -1,57 +1,74 @@
 # Detection: language ID and form ID, both returning ranked candidates (never a scalar verdict).
 #
-# Language ID is heuristic — script (kana/kanji → Japanese), language-specific diacritics, and
-# function-word overlap — with a small English prior as the poetry fallback for unmarked
-# Latin-script text. It is deliberately fallible (poetry resists langID); always allow override.
-# A trained character-n-gram model is the upgrade. Form ID fits every supported form for the
-# language and ranks by the resulting NormScore, with free verse as a fixed baseline.
+# Language ID is a hybrid built on Languages.jl, which gives three complementary things from one
+# dependency: a trigram model over 84 languages, Unicode script detection, and maintained stopword
+# lists. We combine them, scoring each supported language by the strongest signal that fires:
+#   • script — decisive for non-Latin text: Hiragana/Katakana → Japanese, Mandarin → Chinese,
+#     Devanāgarī → Sanskrit (the model labels Devanāgarī as Nepali/Hindi, but the script alone
+#     suffices since Sanskrit is our only Devanāgarī frontend);
+#   • the trigram model's top guess (at its confidence) for Latin-script European languages;
+#   • stopword overlap, which rescues short, function-word text the trigram argmax misreads (a
+#     seven-word English poem can score as Danish — but its stopwords don't);
+#   • our own signals for the two romanizations no trigram model can place, both Latin script:
+#     pinyin-with-tones → Chinese, IAST diacritics → Sanskrit.
+# Form ID fits every supported form for the language and ranks by NormScore (free verse baseline).
 
-const _STOPWORDS = Dict{DataType,Set{String}}(
-    English => Set(["the","a","an","and","of","to","in","is","it","that","he","was","for","on",
-                    "are","with","as","his","they","at","be","this","from","or","by","not","but",
-                    "she","do","if","will","up","under","over","into","no","so","we","you","i"]),
-    French  => Set(["le","la","les","un","une","de","des","du","et","est","que","qui","à","dans",
-                    "ce","il","je","ne","pas","pour","sur","au","aux","en","se","son","sa","ses",
-                    "mon","ma","mes","plus","ou","mais","comme","tout","nous","vous","ils","elle","par","avec"]),
-    Spanish => Set(["el","la","los","las","un","una","de","del","y","que","en","es","se","no",
-                    "por","con","su","para","lo","como","más","o","pero","sus","le","ya","sí",
-                    "porque","esta","entre","cuando","muy","sin","sobre","también","me","hasta","donde","todo","nos"]),
-    Italian => Set(["il","lo","la","i","gli","le","di","del","della","e","che","un","una","è",
-                    "per","con","non","si","come","sono","nel","ma","se","mi","ti","ci","vi",
-                    "da","in","su","al","dei","delle","questo","quello","anche","più","o","ho","ha","ne"]),
-)
+# Languages.jl language types → our Language types, for Latin-script discrimination. The model
+# knows 84 languages; we map only the ones we have frontends for (the rest rank as unsupported).
+const _LJL_TO_LANG = Dict{DataType,DataType}(
+    Languages.English => English, Languages.French => French,
+    Languages.Spanish => Spanish, Languages.Italian => Italian,
+    Languages.Japanese => Japanese, Languages.Mandarin => Chinese)
 
-function _diacritic_bonus!(b::Dict{DataType,Float64}, text)
-    for c in text
-        c in ('ñ', 'Ñ', '¿', '¡')             && (b[Spanish] += 0.3)
-        c in ('ç', 'Ç', 'œ', 'Œ')             && (b[French]  += 0.3)
-    end
-    return b
+# Scripts that pin one of our languages outright, regardless of the model's per-language guess.
+const _SCRIPT_TO_LANG = Dict{DataType,DataType}(
+    Languages.HiraganaScript => Japanese, Languages.KatakanaScript => Japanese,
+    Languages.MandarinScript => Chinese, Languages.DevanagariScript => Sanskrit)
+
+# Languages.jl `stopwords` reads a word-list file per call; cache the sets on first detection.
+const _STOPWORDS = Dict{DataType,Set{String}}()
+function _stopword_sets()
+    isempty(_STOPWORDS) || return _STOPWORDS
+    _STOPWORDS[English] = Set(Languages.stopwords(Languages.English()))
+    _STOPWORDS[French]  = Set(Languages.stopwords(Languages.French()))
+    _STOPWORDS[Spanish] = Set(Languages.stopwords(Languages.Spanish()))
+    _STOPWORDS[Italian] = Set(Languages.stopwords(Languages.Italian()))
+    return _STOPWORDS
 end
 
 """
     detect_language(text) -> Vector{Ranked{Language}}
 
-Ranked language candidates, best first (length ≥ 1). Heuristic; always allow override.
+Ranked language candidates, best first (length ≥ 1). Hybrid over Languages.jl (script + trigram
+model + stopwords) plus our romanization signals; always overridable.
 """
 function detect_language(text::AbstractString)
-    toks = [lowercase(m.match) for m in eachmatch(r"[\p{L}']+", text)]
-    nonspace = count(!isspace, text)
-    jp = count(c -> _is_kana(c) || _is_kanji(c), text)
-    sa = count(c -> ('ऀ' <= c <= 'ॿ') || c in _IAST_SIGNALS, text)   # Devanāgarī / IAST
-    zh = count(_ -> true, eachmatch(r"[a-zA-ZüÜ]+[1-5]", text))      # pinyin-with-tone syllables
-    bonus = _diacritic_bonus!(Dict{DataType,Float64}(English => 0.0, French => 0.0,
-                                                      Spanish => 0.0, Italian => 0.0), text)
-    score = Dict{DataType,Float64}()
-    score[Japanese] = nonspace == 0 ? 0.0 : jp / nonspace
-    score[Sanskrit] = nonspace == 0 ? 0.0 : sa / nonspace
-    score[Chinese]  = isempty(toks) ? 0.0 : zh / length(toks)        # pinyin-with-tones fraction
-    for L in (English, French, Spanish, Italian)
-        hits = isempty(toks) ? 0 : count(t -> t in _STOPWORDS[L], toks)
-        frac = isempty(toks) ? 0.0 : hits / length(toks)
-        score[L] = frac + bonus[L]
+    score = Dict{DataType,Float64}(L => 0.0 for L in
+        (English, French, Spanish, Italian, Japanese, Sanskrit, Chinese))
+
+    tokens = [lowercase(m.match) for m in eachmatch(r"[\p{L}']+", text)]
+    ntok = length(tokens)
+    if ntok > 0
+        score[Chinese] = count(_ -> true, eachmatch(r"[a-zA-ZüÜ]+[1-5]", text)) / ntok  # pinyin-with-tones
+        for (L, sw) in _stopword_sets()                                                 # stopword overlap
+            score[L] = max(score[L], count(in(sw), tokens) / ntok)
+        end
     end
-    score[English] += 0.05      # default prior for unmarked Latin-script text (poetry fallback)
+    nonspace = count(!isspace, text)
+    nonspace > 0 && (score[Sanskrit] = max(score[Sanskrit], count(in(_IAST_SIGNALS), text) / nonspace))  # IAST
+
+    # Trigram model: script is decisive for non-Latin; otherwise trust the top guess at its confidence.
+    if any(isletter, text)
+        lang, script, conf = with_logger(NullLogger()) do
+            Languages.LanguageDetector()(text)
+        end
+        if haskey(_SCRIPT_TO_LANG, typeof(script))
+            score[_SCRIPT_TO_LANG[typeof(script)]] = 1.0
+        else
+            L = get(_LJL_TO_LANG, typeof(lang), nothing)
+            L === nothing || (score[L] = max(score[L], Float64(conf)))
+        end
+    end
 
     ranked = [Ranked(l, normalize_score(RawScore{LangConfidence}(clamp(score[typeof(l)], 0, 1))))
               for l in (English(), French(), Spanish(), Italian(), Japanese(), Sanskrit(), Chinese())]
@@ -59,15 +76,17 @@ function detect_language(text::AbstractString)
     return ranked
 end
 
-# Score of one analysis result, in the common NormScore currency. Free verse is a fixed
-# baseline (0.5): a constrained form must fit better than that to be preferred over "it's just
-# free verse". The threshold is a placeholder pending corpus calibration (see project_map.md).
+# Score of one analysis result, in the common NormScore currency. Free verse scores at a fixed
+# baseline (`_FREEVERSE_BASELINE`, tunable via `set_freeverse_baseline!`): a constrained form
+# must fit better than that to be preferred over "it's just free verse". The baseline is a
+# placeholder pending corpus calibration.
 _score_analysis(a::FormFit)         = normalize_score(RawScore{OTViolations}(   # mean per-line cost
     isempty(a.linefits) ? a.total_violations : a.total_violations / length(a.linefits)))
 _score_analysis(a::CountFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)))
 _score_analysis(a::SyllabicFit)     = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::QuantitativeFit) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::TonalFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
+_score_analysis(a::MatraFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)))
 _score_analysis(a::AllitFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::RhymeFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
 _score_analysis(a::StructureFit)    = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))

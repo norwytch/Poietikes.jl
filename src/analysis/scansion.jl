@@ -1,4 +1,4 @@
-# Human-readable scansion strings (inspired by Python prosodic's output — see docs/comparison.md).
+# Human-readable scansion strings (inspired by Python prosodic's output — see docs/src/comparison.md).
 # `scansion(x)` renders any analysis result as text for inspection: metrical parses show the
 # position template over the realized stress; counted/syllabic/quantitative fits show actuals
 # against targets. Output is thus available both as structured result types and as

@@ -681,7 +681,6 @@ end
     # ── Scansion strings (human-readable output) ──
     @testset "scansion rendering" begin
         m = build_meter(MeterSpec(AccentualSyllabic(), Iamb, 2))
-        syl(s) = Syllable(Phoneme[], s)
         sc = scansion(MetricalParse(m, [[syl(0)], [syl(1)], [syl(0)], [syl(1)]]))
         @test occursin("meter", sc) && occursin("+", sc) && occursin("-", sc)
         # counted form: matching lines marked ✓

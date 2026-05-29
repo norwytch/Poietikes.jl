@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Poietikes = "09fca1fe-24f1-4998-9231-7de1d0d75c53"
+
+[compat]
+Documenter = "1"

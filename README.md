@@ -1,5 +1,7 @@
 # poietikes
 
+[![CI](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://norwytch.github.io/Poietikes.jl/dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A form-aware, multilingual prosodic analysis package for Julia — inspired by Python [prosodic](https://pypi.org/project/prosodic/), and extended beyond English accentual-syllabic verse to the metrical traditions of many languages.
 
 poietikes treats a poem as a pairing of two independent types, **`(Form × Language)`**, and dispatches on that pair. It **analyzes** eleven languages across seven prosodic principles, measuring how well a text fits a declared form; and for an unknown text it **detects** the language and form, returning *ranked candidates* rather than a single guess. (Analysis needs a per-language frontend, so eleven is the real measure of breadth; detection only identifies which of the supported languages a text is.)
@@ -201,7 +203,7 @@ Our derivations from prosodic include:
 - the use of CMUDict as a guide to English pronunciation, which led us to the use of Lexique for French;
 - human-readable scansion strings as the way a parse is presented.
 
-**Added or deliberately divergent:** breadth beyond English accentual-syllabic to the count / syllabic+accent / quantitative / tonal / consonantal axes and eleven languages — including a foot-substitution search for the Greek/Latin and Arabic quantitative metres, and composite fits for Old Norse dróttkvætt and Welsh cynghanedd; first-class language- and form-**detection** (ranked candidates); user extensibility (`@form`, TOML); and two departures from prosodic — **monosyllabic stress flexibility** (prosodic assigns monosyllables a fixed stress; we let the meter assign it, so canonical verse scores zero) and a **fit-against-a-declared-form** stance (prosodic freely scans any line; we measure fit to a stated Form, and answer "which form?" separately via detection). A line-by-line comparison, including where the two diverge and why, is in [`docs/comparison.md`](docs/comparison.md).
+**Added or deliberately divergent:** breadth beyond English accentual-syllabic to the count / syllabic+accent / quantitative / tonal / consonantal axes and eleven languages — including a foot-substitution search for the Greek/Latin and Arabic quantitative metres, and composite fits for Old Norse dróttkvætt and Welsh cynghanedd; first-class language- and form-**detection** (ranked candidates); user extensibility (`@form`, TOML); and two departures from prosodic — **monosyllabic stress flexibility** (prosodic assigns monosyllables a fixed stress; we let the meter assign it, so canonical verse scores zero) and a **fit-against-a-declared-form** stance (prosodic freely scans any line; we measure fit to a stated Form, and answer "which form?" separately via detection). A line-by-line comparison, including where the two diverge and why, is in [`docs/src/comparison.md`](docs/src/comparison.md).
 
 ## Status and limitations
 
@@ -213,3 +215,4 @@ poietikes is pre-1.0 and not yet in Julia's General registry. A few edges worth 
 - **Logographs need a dictionary.** Japanese and Chinese take *phonetic* input (kana, pinyin); raw kanji/hanzi carry no derivable pronunciation and aren't supported.
 - **The Old Norse and Welsh frontends are orthographic approximations** — enough for the consonantal correspondences dróttkvætt and cynghanedd turn on, not a full phonology.
 - **Scoring scales are calibrated, not learned.** The metrical-violation scale is fit to a small corpus; constraint-weight learning is implemented but reports honestly that clean canonical verse under-determines the weights.
+- **Scores are ordinal, not absolute.** A `NormScore` in `[0, 1]` is meaningful for *ranking* candidates, not as a probability — 0.7 doesn't mean "70% a sonnet." The underlying raw cost is on the result (`best(a).analysis.total_cost`) if you need the number itself, and `analyze(…; calibration = …)` makes scoring reproducible against fixed tunables.

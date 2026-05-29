@@ -1,4 +1,4 @@
-# poietikês vs. Python `prosodic`
+# Poietikes.jl vs. Python `prosodic`
 
 A compare/contrast with [`prosodic`](https://github.com/quadrismegistus/prosodic) (Ryan Heuser), the
 library named in our Vision as the conceptual ancestor. Run against `prosodic` 3.3.0 on a shared
@@ -12,18 +12,19 @@ English set. This doubles as a validation harness for our English OT parser: any
   constraints map almost one-to-one onto ours.
 - **They agree on *direction*** — metrical verse scores far better than unmetrical in both.
 - **They differ on *monosyllable stress*** (the headline): `prosodic` assigns every monosyllable a
-  fixed stress and counts each local mismatch, so even canonical Shakespeare scores 1–4; poietikês
+  fixed stress and counts each local mismatch, so even canonical Shakespeare scores 1–4; Poietikes.jl
   treats monosyllables as *flexible* (they conform to their position), so clean verse scores 0.
 - **They answer slightly different questions:** `prosodic` *scans* (find the best parse, any line
-  length); poietikês *fits* a line against a *declared* form, and answers "which form?" separately
+  length); Poietikes.jl *fits* a line against a *declared* form, and answers "which form?" separately
   via `detect_form`.
 - **Different reach:** `prosodic` is deeper and more mature for English accentual-syllabic metrics;
-  poietikês is broader across prosodic *principles* (accentual-syllabic, mora-count, syllabic +
-  accent, quantitative) and languages, with detection and user-extensibility.
+  Poietikes.jl is broader across **seven** prosodic *principles* (count, accentual-syllabic,
+  syllabic + accent, quantitative, moraic, tonal, consonantal) and **eleven** languages, with
+  detection and user-extensibility.
 
 ## Scansion on a shared set
 
-| Line | `prosodic` score | poietikês cost |
+| Line | `prosodic` score | Poietikes.jl cost |
 |---|---|---|
 | Shall I compare thee to a summer's day | 4.0 | **0.0** |
 | When I do count the clock that tells the time | 4.0 | **0.0** |
@@ -40,12 +41,12 @@ controls). The *absolute* numbers differ for the reasons below.
 `prosodic`'s violation breakdown for "Shall I compare thee to a summer's day" was
 `{s_unstress: 2, w_stress: 1, unres_across: 1}`. Those constraints are ours under other names:
 
-| `prosodic` | poietikês | meaning |
+| `prosodic` | Poietikes.jl | meaning |
 |---|---|---|
 | `w_stress` | `StressMaxInWeak` | a stress maximum in a weak position |
 | `s_unstress` | `TroughInStrong` | an unstressed syllable on a strong beat |
 | `unres_across`, resolution constraints | `IllegalResolution`, `PositionSize` | restrictions on doubly-filled positions |
-| (weighted sum) | weighted sum (`_OT_SCALE`-calibrated) | both are Harmonic Grammar |
+| (weighted sum) | weighted sum (calibrated via `Calibration`) | both are Harmonic Grammar |
 
 We additionally separate `Clash` and `Lapse`; `prosodic` ships a larger default set (foot-min,
 position-size variants, etc.). The conceptual frame is the same.
@@ -54,46 +55,46 @@ position-size variants, etc.). The conceptual frame is the same.
 
 `prosodic` scores canonical Shakespeare at 1–4 violations because it gives each monosyllable a
 stress value (from its dictionary/rules) and penalises every mismatch with the metrical position —
-including on function words like *I*, *to*, *thee*. poietikês instead marks monosyllabic words
+including on function words like *I*, *to*, *thee*. Poietikes.jl instead marks monosyllabic words
 **flexible**: their stress is assigned by the meter (full in a strong position, none in a weak one),
 so they never fight the template, and a clean iambic line scores **0**.
 
-Neither is "wrong" — they capture different things. poietikês's treatment is arguably the more
+Neither is "wrong" — they capture different things. Poietikes.jl's treatment is arguably the more
 faithful reading of the Hanson–Kiparsky principle (a metrical line has *no stress maximum in a weak
 position*), giving a clean "is it metrical?" verdict. `prosodic`'s nonzero scores capture **gradient
-tension** and so distinguish lines poietikês flattens to 0 (it rates "Rough winds…" = 1 as smoother
-than "Shall I…" = 4). A future poietikês refinement could expose a similar gradient by scoring
+tension** and so distinguish lines Poietikes.jl flattens to 0 (it rates "Rough winds…" = 1 as smoother
+than "Shall I…" = 4). A future Poietikes.jl refinement could expose a similar gradient by scoring
 secondary/word-class stress rather than fully neutralising monosyllables.
 
 ## Scan vs. fit (the 12-syllable line)
 
 For the 12-syllable prose line, `prosodic` *scans* it as a 12-position line (six feet, score 7) — it
-chooses the line length. poietikês *fits* against the **declared** form (Sonnet ⇒ pentameter, 10
+chooses the line length. Poietikes.jl *fits* against the **declared** form (Sonnet ⇒ pentameter, 10
 positions) and so charges length-mismatch + resolution (cost 19). This reflects the design split:
-`prosodic` answers "what is the best scansion of this line?"; poietikês answers "how well does this
+`prosodic` answers "what is the best scansion of this line?"; Poietikes.jl answers "how well does this
 line satisfy *this form*?" — and answers "which form?" separately and explicitly via `detect_form`
 (ranked candidates), an axis `prosodic` doesn't have.
 
 ## Reach
 
-| | `prosodic` 3.x | poietikês |
+| | `prosodic` 3.x | Poietikes.jl |
 |---|---|---|
-| Prosodic principle | accentual-syllabic (stress) | accentual-syllabic **+ mora-count + syllabic/accent + quantitative** |
-| Languages | English (+ phonemization for many via espeak/gruut) | English, Japanese, French, Spanish, Italian, Sanskrit |
-| Forms | meter parsing; configurable constraints | free verse, sonnet, haiku, tanka, endecasillabo, octosílabo, Bhujaṅgaprayāta, `@form`/TOML |
+| Prosodic principle | accentual-syllabic (stress) | accentual-syllabic **+ count + syllabic/accent + quantitative + moraic + tonal + consonantal** |
+| Languages | English (+ phonemization for many via espeak/gruut) | English, Japanese, French, Spanish, Italian, Sanskrit, Chinese, Latin, Arabic, Old Norse, Welsh |
+| Forms | meter parsing; configurable constraints | free verse, sonnet, haiku, tanka, endecasillabo, octosílabo, jueju, Bhujaṅgaprayāta, dactylic hexameter, ṭawīl, kāmil, dróttkvætt, cywydd, alliterative, `@form`/TOML |
 | Detection | — | `detect_language`, `detect_form` (ranked) |
 | Extensibility | constraint config | by dispatch (`@form`) **and** by data (TOML `DataForm`) |
-| Maturity | mature, research-validated, large dep tree | young, lean (`Downloads`, `TOML`) |
+| Maturity | mature, research-validated, large dep tree | young, lean (`Downloads`, `TOML`, `Languages`, `Logging`) |
 | Output | scansion strings (`-+-+`, capitalised) + pandas DataFrames | structured Julia types (`FormFit`, `Candidate`, …) |
 
 `prosodic` is deeper and battle-tested for **English metrics specifically** (richer constraint set,
-mature tooling, notebook-friendly DataFrames). poietikês trades that depth for **breadth across
+mature tooling, notebook-friendly DataFrames). Poietikes.jl trades that depth for **breadth across
 prosodic principles and languages**, plus first-class detection and extension-by-dispatch.
 
 ## Output format
 
 `prosodic`'s human-readable scansion strings (`shall I com PARE thee…`, `-+-+-+-+--`) are a real
-ergonomic win for inspection. poietikês returns structured types (`FormFit`, `Candidate`, …) **and**
+ergonomic win for inspection. Poietikes.jl returns structured types (`FormFit`, `Candidate`, …) **and**
 a scansion renderer over them — `scansion(x)` (`src/analysis/scansion.jl`) — directly inspired by
 `prosodic`, so a reader gets both the programmatic result and a legible rendering.
 
@@ -101,7 +102,7 @@ a scansion renderer over them — `scansion(x)` (`src/analysis/scansion.jl`) —
 
 - Performance is **not** rigorously benchmarked: a Python↔Julia comparison is confounded by Julia's
   JIT warm-up and `prosodic`'s first-run caching, so a naïve timing would mislead either way.
-  Qualitatively, poietikês has a far lighter dependency footprint.
+  Qualitatively, Poietikes.jl has a far lighter dependency footprint.
 - The two make different stress assumptions, so absolute scores are **not** directly comparable; the
   meaningful comparison is *direction* (both rank metrical ≪ unmetrical) and *constraint structure*.
 

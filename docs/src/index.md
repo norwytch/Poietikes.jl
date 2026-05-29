@@ -4,7 +4,7 @@ A form-aware, multilingual prosodic analysis package for Julia — inspired by P
 [prosodic](https://pypi.org/project/prosodic/), and extended beyond English accentual-syllabic
 verse to the metrical traditions of many languages.
 
-poietikês treats a poem as a pairing of two independent types, `(Form × Language)`, and dispatches
+Poietikes.jl treats a poem as a pairing of two independent types, `(Form × Language)`, and dispatches
 on that pair. It **analyzes** eleven languages across seven prosodic principles, measures how well a
 text fits a declared form, and — for an unknown text — **detects** its language and form, returning
 *ranked candidates* rather than a single guess.

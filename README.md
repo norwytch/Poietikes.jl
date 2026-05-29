@@ -1,20 +1,20 @@
-# poietikes
+# Poietikes.jl
 
 [![CI](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml) [![Docs](https://img.shields.io/badge/docs-blue.svg)](https://norwytch.github.io/Poietikes.jl/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A form-aware, multilingual prosodic analysis package for Julia — inspired by Python [prosodic](https://pypi.org/project/prosodic/), and extended beyond English accentual-syllabic verse to the metrical traditions of many languages.
 
-poietikes treats a poem as a pairing of two independent types, **`(Form × Language)`**, and dispatches on that pair. It **analyzes** eleven languages across seven prosodic principles, measuring how well a text fits a declared form; and for an unknown text it **detects** the language and form, returning *ranked candidates* rather than a single guess. (Analysis needs a per-language frontend, so eleven is the real measure of breadth; detection only identifies which of the supported languages a text is.)
+Poietikes.jl treats a poem as a pairing of two independent types, **`(Form × Language)`**, and dispatches on that pair. It **analyzes** eleven languages across seven prosodic principles, measuring how well a text fits a declared form; and for an unknown text it **detects** the language and form, returning *ranked candidates* rather than a single guess. (Analysis needs a per-language frontend, so eleven is the real measure of breadth; detection only identifies which of the supported languages a text is.)
 
 ## Install
 
-poietikes requires **Julia ≥ 1.10**. It's not in Julia's General registry yet, so install it from the repository:
+Poietikes.jl requires **Julia ≥ 1.10**. It's not in Julia's General registry yet, so install it from the repository:
 
 ```julia
 using Pkg
 Pkg.add(url = "https://github.com/norwytch/Poietikes.jl")
 # …or, for local development:
-Pkg.develop(path = "/path/to/poietikes")
+Pkg.develop(path = "/path/to/Poietikes.jl")
 ```
 
 Pronunciation data is downloaded and cached on first use — [CMUdict](https://github.com/cmusphinx/cmudict) for English, [Lexique](http://www.lexique.org) for French. All other languages currently use rule-based frontends and need no download. 
@@ -127,7 +127,7 @@ Analysis begins by parsing the text into prosodic units under a language hypothe
 
 ### Seven prosodic principles
 
-A form declares constraints on one or more independent **axes**, each a trait function dispatched on `(Form, Language)`. poietikes implements the major pattern-based principles found across traditions:
+A form declares constraints on one or more independent **axes**, each a trait function dispatched on `(Form, Language)`. Poietikes.jl implements the major pattern-based principles found across traditions:
 
 | Axis | Question | Tradition |
 |---|---|---|
@@ -158,7 +158,7 @@ Most axes need no such search; they are direct per-line comparisons: **count** t
 
 ### Scoring and detection
 
-Every fit reduces to a cost, mapped to a comparable score in `[0, 1]` (higher = better); the scale for metrical violations is calibrated against a corpus of known verse so that the metrical/non-metrical boundary lands near 0.5. Detection never returns a single verdict: `detect_language` and `detect_form` return **ranked candidates**, and `analyze` with `:auto` searches the `(language × form)` space and returns candidates best-first, combining language confidence with form fit. `detect_language` is built on Languages.jl's model, which recognizes dozens of languages — but it maps that answer onto poietikes' own supported set rather than reporting all of them, since analysis needs a frontend; the broader model is headroom for languages added later, not current coverage. Constraint weights are tunable and can be estimated from a labelled corpus — though clean canonical verse under-determines them, which the learner reports rather than hides.
+Every fit reduces to a cost, mapped to a comparable score in `[0, 1]` (higher = better); the scale for metrical violations is calibrated against a corpus of known verse so that the metrical/non-metrical boundary lands near 0.5. Detection never returns a single verdict: `detect_language` and `detect_form` return **ranked candidates**, and `analyze` with `:auto` searches the `(language × form)` space and returns candidates best-first, combining language confidence with form fit. `detect_language` is built on Languages.jl's model, which recognizes dozens of languages — but it maps that answer onto Poietikes.jl' own supported set rather than reporting all of them, since analysis needs a frontend; the broader model is headroom for languages added later, not current coverage. Constraint weights are tunable and can be estimated from a labelled corpus — though clean canonical verse under-determines them, which the learner reports rather than hides.
 
 ### Known vs Unknown Texts
 
@@ -195,7 +195,7 @@ text
 
 ### Lineage and references
 
-poietikes is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) [(Ryan Heuser)](https://www.english.cam.ac.uk/people/Ryan.Heuser), which implements the work of Paul Kiparsky and Kristin Hanson in "A Parametric Theory of Poetic Meter," published in *Language*, 1996. The primary way by which we differentiate our two approaches is that we consider prosodic to be primarily focused on metrical-phonological features of human speech directed at metered poetry, and poietikes comes directly with context of poetic forms beyond meter in order to analyze a given text. 
+Poietikes.jl is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) [(Ryan Heuser)](https://www.english.cam.ac.uk/people/Ryan.Heuser), which implements the work of Paul Kiparsky and Kristin Hanson in "A Parametric Theory of Poetic Meter," published in *Language*, 1996. The primary way by which we differentiate our two approaches is that we consider prosodic to be primarily focused on metrical-phonological features of human speech directed at metered poetry, and Poietikes.jl comes directly with context of poetic forms beyond meter in order to analyze a given text. 
 
 Our derivations from prosodic include:
 - constraint-based view of metrical parsing — a line is scanned by minimizing the violations of weighted, violable constraints over candidate parses;
@@ -207,7 +207,7 @@ Our derivations from prosodic include:
 
 ## Status and limitations
 
-poietikes is pre-1.0 and not yet in Julia's General registry. A few edges worth knowing:
+Poietikes.jl is pre-1.0 and not yet in Julia's General registry. A few edges worth knowing:
 
 - **Detection covers seven languages from raw text.** Latin, Arabic, Old Norse, and Welsh are analyzed by naming the language explicitly — their transliteration or orthography reads as Latin script to the detector.
 - **Detection is a closed set — it never returns "unknown."** A text in an unsupported language (German, Russian, …) is mapped to the nearest *supported* language and confidently mislabeled; `is_confident` (a low floor) is the only guard against trusting such a verdict.

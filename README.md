@@ -37,14 +37,10 @@ best(a).analysis      # CountFit(Mora, [5, 7, 5], [5, 7, 5], 0)   — unit, real
 best(a).score.value   # 1.0
 
 println(scansion(a))
-#   Japanese / Haiku  (score 1.0)
-#   count by Mora:
-#     line 1: 5 (want 5) ✓
-#     line 2: 7 (want 7) ✓
-#     line 3: 5 (want 5) ✓
+#   Japanese / Haiku  (score 1.0), then a per-line Mora count: 5 ✓  7 ✓  5 ✓
 ```
 
-The same `Form` can exist across languages, but will naturally differ in parsing needs in accordance with each language's prosody. Ex: a haiku counts morae in Japanese but syllables in English. 
+The same `Form` differs by language: a haiku counts morae in Japanese but syllables in English.
 
 ```julia
 b = analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
@@ -52,7 +48,7 @@ b = analyze("an old silent pond\na frog jumps into the pond\nsplash silence agai
 best(b).analysis        # CountFit(Syllable, [5, 7, 5], [5, 7, 5], 0)  — same form, counted by syllable
 ```
 
-**Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will detect the language — via [Languages.jl](https://github.com/JuliaText/Languages.jl): Unicode script detection, a trigram language model, and stopword lists, plus our own signals for transliterated input (pinyin, IAST) — and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by `NormScore` [0,1], in which 1 is a perfect fit to the form (a constrained form must clear a ~0.6 baseline to be ranked above free verse; `is_confident` separately flags a top candidate that falls below a low floor).
+**Unknown texts** — omit `language`/`form` (both default to `:auto`): Poietikes detects the language and fits every supported form, returning ranked candidates for each. `is_confident` flags whether the top one clears a low floor; the [detection mechanism](#how-it-works) is described below.
 
 ```julia
 a = analyze("Shall I compare thee to a summer's day")   # fetches CMUdict on first run
@@ -67,27 +63,19 @@ detect_form("Shall I compare thee to a summer's day", English())
 #  → 5-element Vector{Ranked}: Sonnet{Shakespearean} (1.0) first, then FreeVerse (0.6), …
 ```
 
-**Define your own forms** — by dispatch with the `@form` macro, or from a TOML file:
+**Going further** — define your own forms (by dispatch or from TOML), analyze a file, or run from the shell:
 
 ```julia
-@form Cinquain English begin
+@form Cinquain English begin           # a new form by dispatch…
     count = (Syllable, [2, 4, 6, 8, 2])
 end
+load_forms("myforms.toml")             # …or define forms in a TOML file
 
-load_forms("myforms.toml")    # register data-defined forms at runtime
+open(io -> analyze(io; form = :haiku), "poem.txt")   # analyze takes an IO as readily as a String
 ```
-
-**From a file, or the terminal** — `analyze` (and `detect_language`/`detect_form`) take an open file as readily as a string:
-
-```julia
-open(io -> analyze(io; form = :haiku), "poem.txt")   # or: analyze(read("poem.txt", String))
-```
-
-…or run it straight from the shell on a file — `language` and `form` are optional, omit them to auto-detect:
 
 ```bash
-julia --project=. scripts/analyze.jl poem.txt
-julia --project=. scripts/analyze.jl haiku.txt japanese haiku
+julia --project=. scripts/analyze.jl poem.txt        # …or straight from the shell (language/form optional)
 ```
 
 ## Languages and forms
@@ -110,28 +98,9 @@ Eleven languages ship with built-in forms. Any `(Form, Language)` cell that isn'
 
 The first seven are auto-detected from raw text. Latin, Arabic, Old Norse, and Welsh take transliteration or orthography that reads as Latin script to the detector, so they're analyzed by naming the language (e.g. `language = :latin`).
 
-## Methodology
+## How it works
 
-We treat a given poetic text as a function of two independent types, `Form` and `Language`, resulting in its `(Form × Language)` pairing. This takes advantage of multiple dispatch in Julia, and this project is organized around the `(Form × Language)` extension of prosodic's metrical-phonological capabilities. 
-
-### The language-relative parse
-
-Analysis begins by parsing the text into prosodic units under a language hypothesis. The same string yields different structure in different languages, so the parse belongs to a candidate, not to the text:
-
-- **English** — grapheme-to-phoneme via CMUdict (ARPABET), syllabified by the Maximum Onset Principle, carrying lexical stress; out-of-vocabulary words fall back to a vowel-group estimate.
-- **Japanese** — kana segmented into morae (small kana absorb into the preceding mora; the sokuon っ, moraic nasal ん, and long mark ー each count as one).
-- **Romance (French, Spanish, Italian)** — rule-based orthographic syllabification: French *e muet* elision and the silent *u* of qu/gu; Spanish/Italian diphthong–hiatus splitting, lexical stress from spelling, and synalepha across word boundaries. French rhyme additionally draws pronunciations from Lexique.
-- **Sanskrit** — IAST transliteration or Devanāgarī, classified into *laghu* (light) and *guru* (heavy) by the classical rule: a syllable is heavy if its vowel is long, or it is closed by a consonant cluster, anusvāra, or visarga.
-- **Chinese** — pinyin with tone numbers classified into level (平) and oblique (仄).
-- **Latin** — macron-marked orthography classified into light/heavy by the classical rule (heavy if the vowel is long or a diphthong, or closed by following consonants), with consonantal *i/j*, *qu*, and the digraphs handled; the weigher is shared with Sanskrit.
-- **Arabic** — phonetic transliteration with explicit long vowels, classified into the same light/heavy weights — the material of the al-Khalīl metres (the *buḥūr*).
-- **Old Norse** — normalized orthography syllabified with word-initial stress, exposing each syllable's onset (for alliteration) and rime (for *hending*, the internal rhyme).
-- **Welsh** — orthography reduced to its ordered consonant sequence (the digraphs *ch, dd, ll, ng, …* read as single consonants), the material of *cynghanedd*.
-- **more languages coming soon**
-
-### Seven prosodic principles
-
-A form declares constraints on one or more independent **axes**, each a trait function dispatched on `(Form, Language)`. Poietikes.jl implements the major pattern-based principles found across traditions:
+A form declares constraints on one or more independent **axes**, each a trait function dispatched on `(Form, Language)`; `analyze` parses the text under a language hypothesis, fits it against those axes, and scores the result. The seven pattern-based principles:
 
 | Axis | Question | Tradition |
 |---|---|---|
@@ -143,71 +112,15 @@ A form declares constraints on one or more independent **axes**, each a trait fu
 | **tonal** | does the level/oblique sequence match? | Tang regulated verse |
 | **consonantal** | do the right consonants recur — onsets, or whole sequences? | Germanic alliteration; Old Norse dróttkvætt; Welsh cynghanedd |
 
-Beyond these per-line principles, two axes range across the whole poem: **rhyme** — do the lines a scheme marks as rhyming actually rhyme? — and **structure** — the right number of lines and stanzas? A form may combine any of the axes, and a few fuse several at once: Old Norse dróttkvætt is count + line-pair alliteration + internal rhyme, Welsh cynghanedd is count + consonant-sequence harmony.
+Two further axes range across the whole poem — **rhyme** (do the lines a scheme marks as rhyming actually rhyme?) and **structure** (the right number of lines and stanzas) — and a form may fuse several at once: Old Norse dróttkvætt is count + line-pair alliteration + internal rhyme. A form that declares nothing — free verse — is described by its prosodic features rather than fit to a template; that's also the graceful fallback when a form isn't defined for a language.
 
-A form that declares no constraints on any axis, ie, free verse, is treated as having no template and analyzed solely through its prosodic features: stanza and line counts, the number of units (syllables or morae) per line, the total syllable count, and the per-line stress profile. This is also the fallback when a form isn't defined for a given language — it is analyzed as if it had no template, rather than refused. 
+Every fit reduces to a cost mapped to a comparable score in `[0, 1]` (higher = better), calibrated so the metrical/non-metrical boundary lands near 0.5; pass a `Calibration` to `analyze` for reproducible scoring. Detection never returns a single verdict: `detect_language` and `detect_form` give **ranked candidates**, and `analyze(:auto)` searches the `(language × form)` space best-first.
 
-### Metrical parsing as constraint optimization
+**The full methodology** — the per-language parse rules, the Optimality-Theoretic metrical parser, the scoring and detection internals, and the analysis pipelines — is in the [documentation](https://norwytch.github.io/Poietikes.jl/) ([methodology page](docs/src/methodology.md)).
 
-The accentual-syllabic parser is derived directly from prosodic, and is the most involved axis, following the generative-metrics tradition. A line is parsed by mapping its syllables onto a sequence of metrical positions (weak/strong, derived from the foot and line length). A position may hold one or two syllables, which covers resolution and feminine endings and is the source of optionality the parser searches over. Each candidate parse is scored by a set of violable, weighted constraints (ie, a Harmonic Grammar (weighted sum) rather than strict OT ranking), and the lowest-cost parse wins. In descending weight:
+## Lineage
 
-- ***Stress maximum in a weak position*** — the cardinal violation: a syllable more prominent than both neighbours, landing off the beat.
-- ***Trough in a strong position*** — an unstressed dip on the beat.
-- **Clash** and **lapse** — rhythmic constraints.
-- **Illegal resolution** — a near-categorical bar on splitting a stressed or heavy syllable across one position.
-
-Two choices follow Hanson & Kiparsky: **monosyllabic words are stress-flexible** — their stress is assigned by the meter, so a function word never fights the template (this is why canonical pentameter scores zero) — and resolution is restricted to light, unstressable syllables. The quantitative and tonal axes take weight and tone as the per-syllable property in place of stress; the consonantal axis works on onsets, and on the consonant sequences of the harmony traditions.
-
-Most axes need no such search; they are direct per-line comparisons: **count** tallies the units in each line against the target (e.g. 5-7-5); **moraic** sums each line's morae (light = 1, heavy = 2) against a target; **syllabic** checks that count plus the caesura and accent positions; **tonal** compares the line's level/oblique sequence to a target pattern, position by position; and **rhyme** and **structure** compare realized rimes and line/stanza counts to what the form declares. **Quantitative** metre is a direct comparison too when its target is a fixed light/heavy pattern (Sanskrit) — but when the metre is built from *feet that may substitute* (a dactyl contracting to a spondee in Greek/Latin hexameter; the *ziḥāf* variants of the Arabic *buḥūr*), each foot offers several light/heavy realizations and the best-fitting combination is searched for: the quantitative analog of the metrical parse. The **consonantal** axis likewise ranges from the simple — counting how many stressed onsets agree — to composite forms that check several correspondences at once: Old Norse dróttkvætt (line-pair alliteration plus internal half/full rhyme) and Welsh cynghanedd (consonant-sequence harmony). So meter and the foot-substitution metres are the parsers; the rest are short, near-identical `_*_fit` comparisons.
-
-### Scoring and detection
-
-Every fit reduces to a cost, mapped to a comparable score in `[0, 1]` (higher = better); the scale for metrical violations is calibrated against a corpus of known verse so that the metrical/non-metrical boundary lands near 0.5. Detection never returns a single verdict: `detect_language` and `detect_form` return **ranked candidates**, and `analyze` with `:auto` searches the `(language × form)` space and returns candidates best-first, combining language confidence with form fit. `detect_language` is built on Languages.jl's model, which recognizes dozens of languages — but it maps that answer onto its own supported set rather than reporting all of them, since analysis needs a frontend; the broader model is headroom for languages added later, not current coverage. Constraint weights are tunable and can be estimated from a labelled corpus — though clean canonical verse under-determines them, which the learner reports rather than hides.
-
-### Known vs Unknown Texts
-
-**Known** — `analyze(text; language = :japanese, form = :haiku)` (both supplied):
-
-```text
-text
- └─ resolve :japanese → Japanese()                       # _resolve_language
-     └─ prosodic_parse(text, Japanese()) → ParsedPoem    # language-relative units
-         └─ resolve :haiku → Haiku()                      # _resolve_form
-             └─ supports(Haiku, Japanese)?  → yes
-                 └─ mode(Haiku, Japanese) → Prescriptive
-                     └─ fit(Haiku, Japanese, parsed)      # routed by the declared axis → CountFit
-                 └─ score = (the fit's normalized score)  # pure fit; no language uncertainty
- └─ Analysis(text, [Candidate(…)])  →  best() is the one verdict
-```
-
-`fit` dispatches on whichever axis the form declares: meter → `FormFit` (the OT search) / quantitative → `QuantitativeFit` / tonal → `TonalFit` / syllabic → `SyllabicFit`; else count → `CountFit`, moraic → `MatraFit`, alliteration → `AllitFit`, rhyme → `RhymeFit`, structure → `StructureFit`; a multi-constraint form (Old Norse dróttkvætt → `DrottkvaettFit`, Welsh cynghanedd → `CynghaneddFit`) declares a composite fit that checks several axes at once; and a form with no constraints (free verse) is scored descriptively by `features`.
-
-**Unknown** — `analyze(text)` (both `:auto`):
-
-```text
-text
- └─ detect_language(text) → ranked [Language ⇒ confidence]   # Languages.jl: script + trigram + stopwords; our pinyin/IAST signals
-     keep the languages within 0.6× the best score
-     └─ for each candidate language L:
-         prosodic_parse(text, L) → ParsedPoem                # re-parsed under each hypothesis
-         └─ for each form F in supported_forms(L):
-             analysis = mode(F, L)==Descriptive ? features(parsed) : fit(F, L, parsed)
-             score    = combine(confidence(L), score(analysis))   # language × form fit
-             collect Candidate(L, F, analysis, score)
- └─ sort candidates by score, best-first  →  Analysis        # ranked; best() = top, never a lone verdict
-```
-
-### Lineage and references
-
-Poietikes.jl is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) [(Ryan Heuser)](https://www.english.cam.ac.uk/people/Ryan.Heuser), which implements the work of Paul Kiparsky and Kristin Hanson in "A Parametric Theory of Poetic Meter," published in *Language*, 1996. The primary way by which we differentiate our two approaches is that we consider prosodic to be primarily focused on metrical-phonological features of human speech directed at metered poetry, and Poietikes.jl comes directly with context of poetic forms beyond meter in order to analyze a given text. 
-
-Our derivations from prosodic include:
-- constraint-based view of metrical parsing — a line is scanned by minimizing the violations of weighted, violable constraints over candidate parses;
-- English accentual-syllabic constraint vocabulary, which is taken entirely from prosodic and translated to Julia via `StressMaxInWeak` / `TroughInStrong` / `IllegalResolution` ≈ prosodic's `w_stress` / `s_unstress` / `unres_across`;
-- the use of CMUdict as a guide to English pronunciation, which led us to the use of Lexique for French;
-- human-readable scansion strings as the way a parse is presented.
-
-**Added or deliberately divergent:** breadth beyond English accentual-syllabic to the count / syllabic+accent / quantitative / moraic / tonal / consonantal axes and eleven languages — including a foot-substitution search for the Greek/Latin and Arabic quantitative metres, and composite fits for Old Norse dróttkvætt and Welsh cynghanedd; first-class language- and form-**detection** (ranked candidates); user extensibility (`@form`, TOML); and two departures from prosodic — **monosyllabic stress flexibility** (prosodic assigns monosyllables a fixed stress; we let the meter assign it, so canonical verse scores zero) and a **fit-against-a-declared-form** stance (prosodic freely scans any line; we measure fit to a stated Form, and answer "which form?" separately via detection). A line-by-line comparison, including where the two diverge and why, is in [`docs/src/comparison.md`](docs/src/comparison.md).
+Poietikes.jl is indebted to [`prosodic`](https://github.com/quadrismegistus/prosodic) [(Ryan Heuser)](https://www.english.cam.ac.uk/people/Ryan.Heuser), which implements Paul Kiparsky and Kristin Hanson's "A Parametric Theory of Poetic Meter" (*Language*, 1996). We borrow its constraint-based metrical parse and English constraint vocabulary (`StressMaxInWeak` ≈ prosodic's `w_stress`, etc.) and its human-readable scansion output; we add breadth across the seven principles and eleven languages, ranked language- and form-**detection**, and user extensibility (`@form`, TOML). A line-by-line comparison — including the deliberate divergences (monosyllable flexibility; fit-vs-scan) — is in [`docs/src/comparison.md`](docs/src/comparison.md).
 
 ## Status and limitations
 

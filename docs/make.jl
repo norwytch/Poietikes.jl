@@ -12,6 +12,7 @@ makedocs(;
         "Home"                => "index.md",
         "Methodology"         => "methodology.md",
         "Adding a language"   => "adding-a-language.md",
+        "Research scripts"    => "research.md",
         "vs. Python prosodic" => "comparison.md",
         "API reference"       => "api.md",
     ],

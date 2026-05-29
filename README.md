@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml) [![Docs](https://img.shields.io/badge/docs-blue.svg)](https://norwytch.github.io/Poietikes.jl/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A form-aware, multilingual prosodic analysis package for Julia — inspired by Python [prosodic](https://pypi.org/project/prosodic/), and extended beyond English accentual-syllabic verse to the metrical traditions of many languages.
+A form-aware, multilingual prosodic analysis package for Julia, inspired by Python [prosodic](https://pypi.org/project/prosodic/).
 
-Poietikes.jl treats a poem as a pairing of two independent types, **`(Form × Language)`**, and dispatches on that pair. It **analyzes** eleven languages across seven prosodic principles, measuring how well a text fits a declared form; and for an unknown text it **detects** the language and form, returning *ranked candidates* rather than a single guess. (Analysis needs a per-language frontend, so eleven is the real measure of breadth; detection only identifies which of the supported languages a text is.)
+Poietikes.jl treats a poem as a pairing of two independent types, **`(Form × Language)`**, and dispatches on that pair to measure how well a text fits a declared form. For an unknown text it returns ranked candidates for language and form.
 
 ## Install
 
@@ -33,8 +33,8 @@ Every call returns an `Analysis` — ranked candidates, best first. `best(a)` gi
 # A haiku, counted in morae (Japanese is rule-based — runs offline)
 a = analyze("ふるいけや\nかわずとびこむ\nみずのおと"; language = :japanese, form = :haiku)
 
-best(a).analysis      # CountFit: morae per line [5, 7, 5] vs target [5, 7, 5]
-best(a).score.value   # 1.0  — a perfect fit
+best(a).analysis      # CountFit(Mora, [5, 7, 5], [5, 7, 5], 0)   — unit, realized, target, cost
+best(a).score.value   # 1.0
 
 println(scansion(a))
 #   Japanese / Haiku  (score 1.0)
@@ -47,8 +47,9 @@ println(scansion(a))
 The same `Form` can exist across languages, but will naturally differ in parsing needs in accordance with each language's prosody. Ex: a haiku counts morae in Japanese but syllables in English. 
 
 ```julia
-analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
-        language = :english, form = :haiku)        # CountFit, by Syllable
+b = analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
+            language = :english, form = :haiku)
+best(b).analysis        # CountFit(Syllable, [5, 7, 5], [5, 7, 5], 0)  — same form, counted by syllable
 ```
 
 **Unknown texts** — omit `language`/`form`, which will both default to `:auto`. Poietikes will detect the language — via [Languages.jl](https://github.com/JuliaText/Languages.jl): Unicode script detection, a trigram language model, and stopword lists, plus our own signals for transliterated input (pinyin, IAST) — and analyze the text based on known forms within that language. It will return candidates for both `Language` and `Form`, ranked by `NormScore` [0,1], in which 1 is a perfect fit to the form (a constrained form must clear a ~0.6 baseline to be ranked above free verse; `is_confident` separately flags a top candidate that falls below a low floor).
@@ -56,11 +57,14 @@ analyze("an old silent pond\na frog jumps into the pond\nsplash silence again";
 ```julia
 a = analyze("Shall I compare thee to a summer's day")   # fetches CMUdict on first run
 best(a).language      # English()
-best(a).form          # Sonnet{Shakespearean}()  — detected as iambic pentameter
+best(a).form          # Sonnet{Shakespearean}()   — the iambic-pentameter fit wins
 is_confident(a)       # true
 
-detect_language("the cat sat on the mat")                         # ranked Vector{Ranked{Language}}
-detect_form("Shall I compare thee to a summer's day", English())  # ranked Vector{Ranked{Form}}
+detect_language("the cat sat on the mat")
+#  → 7-element Vector{Ranked}: English (≈0.84) first, then French, Spanish, …
+
+detect_form("Shall I compare thee to a summer's day", English())
+#  → 5-element Vector{Ranked}: Sonnet{Shakespearean} (1.0) first, then FreeVerse (0.6), …
 ```
 
 **Define your own forms** — by dispatch with the `@form` macro, or from a TOML file:
@@ -117,13 +121,13 @@ Analysis begins by parsing the text into prosodic units under a language hypothe
 - **English** — grapheme-to-phoneme via CMUdict (ARPABET), syllabified by the Maximum Onset Principle, carrying lexical stress; out-of-vocabulary words fall back to a vowel-group estimate.
 - **Japanese** — kana segmented into morae (small kana absorb into the preceding mora; the sokuon っ, moraic nasal ん, and long mark ー each count as one).
 - **Romance (French, Spanish, Italian)** — rule-based orthographic syllabification: French *e muet* elision and the silent *u* of qu/gu; Spanish/Italian diphthong–hiatus splitting, lexical stress from spelling, and synalepha across word boundaries. French rhyme additionally draws pronunciations from Lexique.
-- **Sanskrit** — IAST transliteration classified into *laghu* (light) and *guru* (heavy) by the classical rule: a syllable is heavy if its vowel is long, or it is closed by a consonant cluster, anusvāra, or visarga.
+- **Sanskrit** — IAST transliteration or Devanāgarī, classified into *laghu* (light) and *guru* (heavy) by the classical rule: a syllable is heavy if its vowel is long, or it is closed by a consonant cluster, anusvāra, or visarga.
 - **Chinese** — pinyin with tone numbers classified into level (平) and oblique (仄).
 - **Latin** — macron-marked orthography classified into light/heavy by the classical rule (heavy if the vowel is long or a diphthong, or closed by following consonants), with consonantal *i/j*, *qu*, and the digraphs handled; the weigher is shared with Sanskrit.
 - **Arabic** — phonetic transliteration with explicit long vowels, classified into the same light/heavy weights — the material of the al-Khalīl metres (the *buḥūr*).
 - **Old Norse** — normalized orthography syllabified with word-initial stress, exposing each syllable's onset (for alliteration) and rime (for *hending*, the internal rhyme).
 - **Welsh** — orthography reduced to its ordered consonant sequence (the digraphs *ch, dd, ll, ng, …* read as single consonants), the material of *cynghanedd*.
-- **more languages coming soon!**
+- **more languages coming soon**
 
 ### Seven prosodic principles
 
@@ -158,7 +162,7 @@ Most axes need no such search; they are direct per-line comparisons: **count** t
 
 ### Scoring and detection
 
-Every fit reduces to a cost, mapped to a comparable score in `[0, 1]` (higher = better); the scale for metrical violations is calibrated against a corpus of known verse so that the metrical/non-metrical boundary lands near 0.5. Detection never returns a single verdict: `detect_language` and `detect_form` return **ranked candidates**, and `analyze` with `:auto` searches the `(language × form)` space and returns candidates best-first, combining language confidence with form fit. `detect_language` is built on Languages.jl's model, which recognizes dozens of languages — but it maps that answer onto Poietikes.jl' own supported set rather than reporting all of them, since analysis needs a frontend; the broader model is headroom for languages added later, not current coverage. Constraint weights are tunable and can be estimated from a labelled corpus — though clean canonical verse under-determines them, which the learner reports rather than hides.
+Every fit reduces to a cost, mapped to a comparable score in `[0, 1]` (higher = better); the scale for metrical violations is calibrated against a corpus of known verse so that the metrical/non-metrical boundary lands near 0.5. Detection never returns a single verdict: `detect_language` and `detect_form` return **ranked candidates**, and `analyze` with `:auto` searches the `(language × form)` space and returns candidates best-first, combining language confidence with form fit. `detect_language` is built on Languages.jl's model, which recognizes dozens of languages — but it maps that answer onto its own supported set rather than reporting all of them, since analysis needs a frontend; the broader model is headroom for languages added later, not current coverage. Constraint weights are tunable and can be estimated from a labelled corpus — though clean canonical verse under-determines them, which the learner reports rather than hides.
 
 ### Known vs Unknown Texts
 
@@ -200,10 +204,10 @@ Poietikes.jl is indebted to [`prosodic`](https://github.com/quadrismegistus/pros
 Our derivations from prosodic include:
 - constraint-based view of metrical parsing — a line is scanned by minimizing the violations of weighted, violable constraints over candidate parses;
 - English accentual-syllabic constraint vocabulary, which is taken entirely from prosodic and translated to Julia via `StressMaxInWeak` / `TroughInStrong` / `IllegalResolution` ≈ prosodic's `w_stress` / `s_unstress` / `unres_across`;
-- the use of CMUDict as a guide to English pronunciation, which led us to the use of Lexique for French;
+- the use of CMUdict as a guide to English pronunciation, which led us to the use of Lexique for French;
 - human-readable scansion strings as the way a parse is presented.
 
-**Added or deliberately divergent:** breadth beyond English accentual-syllabic to the count / syllabic+accent / quantitative / tonal / consonantal axes and eleven languages — including a foot-substitution search for the Greek/Latin and Arabic quantitative metres, and composite fits for Old Norse dróttkvætt and Welsh cynghanedd; first-class language- and form-**detection** (ranked candidates); user extensibility (`@form`, TOML); and two departures from prosodic — **monosyllabic stress flexibility** (prosodic assigns monosyllables a fixed stress; we let the meter assign it, so canonical verse scores zero) and a **fit-against-a-declared-form** stance (prosodic freely scans any line; we measure fit to a stated Form, and answer "which form?" separately via detection). A line-by-line comparison, including where the two diverge and why, is in [`docs/src/comparison.md`](docs/src/comparison.md).
+**Added or deliberately divergent:** breadth beyond English accentual-syllabic to the count / syllabic+accent / quantitative / moraic / tonal / consonantal axes and eleven languages — including a foot-substitution search for the Greek/Latin and Arabic quantitative metres, and composite fits for Old Norse dróttkvætt and Welsh cynghanedd; first-class language- and form-**detection** (ranked candidates); user extensibility (`@form`, TOML); and two departures from prosodic — **monosyllabic stress flexibility** (prosodic assigns monosyllables a fixed stress; we let the meter assign it, so canonical verse scores zero) and a **fit-against-a-declared-form** stance (prosodic freely scans any line; we measure fit to a stated Form, and answer "which form?" separately via detection). A line-by-line comparison, including where the two diverge and why, is in [`docs/src/comparison.md`](docs/src/comparison.md).
 
 ## Status and limitations
 

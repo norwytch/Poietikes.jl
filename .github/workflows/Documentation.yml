@@ -6,10 +6,16 @@ on:
     tags: ['*']
   pull_request:
 
-# Needed for Documenter to push the built site to the gh-pages branch.
+# Deploy via the "GitHub Actions" Pages source (no gh-pages branch).
 permissions:
-  contents: write
-  statuses: write
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deployment at a time; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -22,8 +28,19 @@ jobs:
       - uses: julia-actions/cache@v2
       - name: Install docs environment
         run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path = pwd())); Pkg.instantiate()'
-      - name: Build and deploy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}        # for deploying to gh-pages
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}    # optional SSH deploy key, if configured
+      - name: Build the docs (into docs/build)
         run: julia --project=docs docs/make.jl
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'   # build on PRs, but only deploy from main
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

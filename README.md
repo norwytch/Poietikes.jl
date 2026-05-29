@@ -1,6 +1,6 @@
 # poietikes
 
-[![CI](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://norwytch.github.io/Poietikes.jl/dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/norwytch/Poietikes.jl/actions/workflows/CI.yml) [![Docs](https://img.shields.io/badge/docs-blue.svg)](https://norwytch.github.io/Poietikes.jl/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A form-aware, multilingual prosodic analysis package for Julia — inspired by Python [prosodic](https://pypi.org/project/prosodic/), and extended beyond English accentual-syllabic verse to the metrical traditions of many languages.
 

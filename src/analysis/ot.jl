@@ -18,23 +18,25 @@ Number of times `parse` violates `constraint` (≥ 0). The extension point for n
 function violations end
 
 """
-    weight(constraint) -> Float64
+    weight(constraint, cal = default_calibration()) -> Float64
 
-Severity of the constraint in the weighted total. Reads a mutable override store (set via
+Severity of the constraint in the weighted total. Reads `cal`'s per-constraint overrides (set via
 `set_constraint_weight!`, e.g. by a weight learner), falling back to the principled default.
 """
-const _CONSTRAINT_WEIGHTS = Dict{DataType,Float64}()
-weight(c::MetricalConstraint) = get(_CONSTRAINT_WEIGHTS, typeof(c), _default_weight(c))
+weight(c::MetricalConstraint, cal::Calibration = default_calibration()) =
+    get(cal.constraint_weights, typeof(c), _default_weight(c))
 
 """
     set_constraint_weight!(ConstraintType, w)
     reset_constraint_weights!()
 
-Override (or clear all) metrical-constraint weights — the knob a calibrator/learner tunes.
+Override (or clear all) metrical-constraint weights in the default `Calibration` — the knob a
+calibrator/learner tunes. For reproducible runs, build a `Calibration` with explicit
+`constraint_weights` and pass it to `analyze` rather than mutating the default.
 """
 set_constraint_weight!(::Type{C}, w::Real) where {C<:MetricalConstraint} =
-    (_CONSTRAINT_WEIGHTS[C] = Float64(w); nothing)
-reset_constraint_weights!() = (empty!(_CONSTRAINT_WEIGHTS); nothing)
+    (default_calibration().constraint_weights[C] = Float64(w); nothing)
+reset_constraint_weights!() = (empty!(default_calibration().constraint_weights); nothing)
 
 _default_weight(::MetricalConstraint) = 1.0
 
@@ -180,7 +182,8 @@ align (outside `[P, 2P]` positions), returns `(nothing, |n−P|, [:length_mismat
 # unmetrical as a stress fault, so it must score low rather than near a clean fit.
 const _LENGTH_MISMATCH_WEIGHT = 4
 
-function best_parse(meter::Meter, syls::Vector{Syllable}, constraints = default_constraints())
+function best_parse(meter::Meter, syls::Vector{Syllable}, constraints = default_constraints(),
+                    cal::Calibration = default_calibration())
     P, n = length(meter.positions), length(syls)
     combos = _compositions(n, P)
     if isempty(combos)
@@ -191,7 +194,7 @@ function best_parse(meter::Meter, syls::Vector{Syllable}, constraints = default_
     for sizes in combos
         parse  = MetricalParse(meter, _slots(syls, sizes))
         counts = [(c, violations(c, parse)) for c in constraints]
-        cost   = sum(weight(c) * v for (c, v) in counts; init = 0.0)
+        cost   = sum(weight(c, cal) * v for (c, v) in counts; init = 0.0)
         if cost < bestcost
             best, bestcost = parse, cost
             bestbreak = Pair{Symbol,Int}[name(c) => v for (c, v) in counts]
@@ -214,13 +217,13 @@ struct FormFit <: AnalysisResult
     total_violations::Float64
 end
 
-function _metrical_fit(parsed::ParsedPoem, ms::MeterSpec)
+function _metrical_fit(parsed::ParsedPoem, ms::MeterSpec, cal::Calibration = default_calibration())
     meter = build_meter(ms)
     constraints = default_constraints()
     linefits = LineFit[]
     for l in lines(parsed)
         syls = Syllable[u for u in l.units if u isa Syllable]
-        parse, cost, breakdown = best_parse(meter, syls, constraints)
+        parse, cost, breakdown = best_parse(meter, syls, constraints, cal)
         push!(linefits, LineFit(l, parse, cost, breakdown))
     end
     return FormFit(meter, linefits, sum(lf.cost for lf in linefits; init = 0.0))
@@ -234,10 +237,10 @@ quantitative meter → `QuantitativeFit`, syllabic meter (Romance) → `Syllabic
 axis (haiku/tanka) → `CountFit`. Forms declaring none of these fall back to descriptive
 features (rhyme/structure-only forms — until those axes are fit).
 """
-function fit(form::Form, lang::Language, parsed::ParsedPoem)
+function fit(form::Form, lang::Language, parsed::ParsedPoem, cal::Calibration = default_calibration())
     ms = meterspec(form, lang)
     if ms !== nothing
-        ms.foot !== nothing      && return _metrical_fit(parsed, ms)     # accentual-syllabic (foot-based)
+        ms.foot !== nothing      && return _metrical_fit(parsed, ms, cal) # accentual-syllabic (foot-based)
         if ms.kind isa Quantitative                                      # quantitative (L/H)
             return isempty(ms.feet) ? _quantitative_fit(parsed, ms) :    #   fixed pattern (Sanskrit)
                                       _quantitative_search(parsed, ms)   #   foot alternatives (Greek/Latin)

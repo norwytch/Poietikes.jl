@@ -28,11 +28,13 @@ from known-metrical verse and from non-metrical controls.
 """
 calibrate_ot_scale(metrical, control) = max((_mean(metrical) + _mean(control)) / 2, eps())
 
-"Install a calibrated OTViolations scale (see `normalize_score`)."
-set_ot_scale!(s::Real) = (_OT_SCALE[] = Float64(s); nothing)
+"Install a calibrated OTViolations scale on the default `Calibration` (see `normalize_score`)."
+set_ot_scale!(s::Real) = (c = default_calibration();
+    _DEFAULT_CALIBRATION[] = Calibration(Float64(s), c.freeverse_baseline, c.constraint_weights); nothing)
 
-"Set the free-verse baseline a constrained form must beat in detection."
-set_freeverse_baseline!(x::Real) = (_FREEVERSE_BASELINE[] = Float64(x); nothing)
+"Set the free-verse baseline (on the default `Calibration`) a constrained form must beat in detection."
+set_freeverse_baseline!(x::Real) = (c = default_calibration();
+    _DEFAULT_CALIBRATION[] = Calibration(c.ot_scale, Float64(x), c.constraint_weights); nothing)
 
 """
     learn_constraint_weights(metrical, control; form, language) -> Dict{DataType,Float64}

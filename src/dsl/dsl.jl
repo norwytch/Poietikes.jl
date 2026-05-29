@@ -37,9 +37,9 @@ macro form(name::Symbol, lang::Symbol, block::Expr)
     defs = Any[:(struct $name <: $(GlobalRef(Poietikes, :Form)) end)]
     for stmt in block.args
         stmt isa LineNumberNode && continue
-        (stmt isa Expr && stmt.head === :(=)) || error("@form: expected `axis = (args...)`, got $stmt")
+        (stmt isa Expr && stmt.head === :(=)) || throw(ArgumentError("@form: expected `axis = (args...)`, got $stmt"))
         axis = stmt.args[1]::Symbol
-        haskey(_AXIS, axis) || error("@form: unknown axis `$axis` (count/meter/rhyme/structure)")
+        haskey(_AXIS, axis) || throw(ArgumentError("@form: unknown axis `$axis` (expected count, meter, rhyme, structure, allit, or matra)"))
         spectype, trait = _AXIS[axis]
         val = stmt.args[2]
         push!(defs, :($(GlobalRef(Poietikes, trait))(::$name, ::$lang) =
@@ -51,19 +51,21 @@ end
 
 # ── load_forms: data-driven forms from TOML ──
 _resolve_unit(s) = s == "syllable" ? Syllable : s == "mora" ? Mora : s == "phoneme" ? Phoneme :
-    error("load_forms: unknown unit \"$s\"")
+    throw(ArgumentError("load_forms: unknown unit \"$s\" (expected \"syllable\", \"mora\", or \"phoneme\")"))
 
 function _resolve_meterkind(s)
     s == "accentual_syllabic" && return AccentualSyllabic()
     s == "syllabic"           && return Syllabic()
     s == "quantitative"       && return Quantitative()
     s == "tonal"              && return Tonal()
-    error("load_forms: unknown meter kind \"$s\"")
+    throw(ArgumentError("load_forms: unknown meter kind \"$s\" " *
+        "(expected \"accentual_syllabic\", \"syllabic\", \"quantitative\", or \"tonal\")"))
 end
 
 const _FOOTS = Dict("iamb" => Iamb, "trochee" => Trochee, "anapest" => Anapest,
                     "dactyl" => Dactyl, "spondee" => Spondee, "pyrrhic" => Pyrrhic)
-_resolve_foot(s) = get(() -> error("load_forms: unknown foot \"$s\""), _FOOTS, s)
+_resolve_foot(s) = get(() -> throw(ArgumentError(
+    "load_forms: unknown foot \"$s\" (expected iamb, trochee, anapest, dactyl, spondee, or pyrrhic)")), _FOOTS, s)
 
 function _meterspec_from_toml(m)
     MeterSpec(_resolve_meterkind(m["kind"]),
@@ -104,7 +106,7 @@ function load_forms(path::AbstractString)
         for lstr in langs
             lang = _resolve_language(Symbol(lstr))
             Symbol(name) in (formname(f) for f in supported_forms(lang)) &&
-                error("load_forms: form :$name collides with an existing form for $(typeof(lang))")
+                throw(ArgumentError("load_forms: form :$name collides with an existing form for $(typeof(lang))"))
             register!(df, lang)
         end
         push!(loaded, df)

@@ -21,20 +21,34 @@ struct NormScore
     provenance::Vector{Pair{Symbol,Float64}}   # what fed in, raw — for explaining results
 end
 
-# OTViolations scale: weighted-violation cost mapping to score 0.5. Calibrated (scoring/
-# calibrate.jl) on Shakespeare pentameter (per-line cost ≈ 0) vs length-matched trochaic
-# controls (≈ 24), midpoint ≈ 12 — so 0.5 sits at ~three stress-maxima-in-weak per line.
-# `set_ot_scale!` re-tunes it. Other kinds keep parameter-free 1/(1+x) (their costs are small).
-const _OT_SCALE = Ref(12.0)
+# ── Calibration: the tunables that turn raw costs into scores, carried as a value ──
+# Holding them in a `Calibration` (rather than globals) lets `analyze`/`detect_form` take one and
+# score reproducibly and thread-safely: pass your own and nothing global is consulted. Fields:
+#   • ot_scale — the OTViolations cost mapping to score 0.5; calibrated (scoring/calibrate.jl) on
+#     Shakespeare pentameter (per-line cost ≈ 0) vs length-matched trochaic controls (≈ 24),
+#     midpoint ≈ 12 (so 0.5 ≈ three stress-maxima-in-weak per line);
+#   • freeverse_baseline — the score a constrained form must beat to win over "it's just free
+#     verse" (0.6 ⇒ only a near-perfect fit wins);
+#   • constraint_weights — per-constraint weight overrides keyed by type; empty ⇒ principled defaults.
+struct Calibration
+    ot_scale::Float64
+    freeverse_baseline::Float64
+    constraint_weights::Dict{DataType,Float64}
+end
+Calibration(; ot_scale = 12.0, freeverse_baseline = 0.6, constraint_weights = Dict{DataType,Float64}()) =
+    Calibration(ot_scale, freeverse_baseline, constraint_weights)
 
-# Free-verse baseline: the score a constrained form must beat to win over "it's just free verse".
-# Tunable (set_freeverse_baseline!); 0.6 means only a near-perfect fit wins. Calibrating it
-# against a labelled form/free-verse corpus is tracked deferred work.
-const _FREEVERSE_BASELINE = Ref(0.6)
+# The process default, consulted when a call isn't given a Calibration. The `set_*` knobs
+# (scoring/calibrate.jl) mutate it; for reproducible/concurrent runs, pass an explicit Calibration.
+const _DEFAULT_CALIBRATION = Ref(Calibration())
+default_calibration() = _DEFAULT_CALIBRATION[]
 
-normalize_score(s::RawScore{LangConfidence}) = NormScore(clamp(s.value, 0, 1),       [:lang_conf => s.value])
-normalize_score(s::RawScore{OTViolations})   = NormScore(1 / (1 + s.value / _OT_SCALE[]), [:ot_viol => s.value])
-normalize_score(s::RawScore{CountDistance})  = NormScore(1 / (1 + s.value),          [:count     => s.value])
+normalize_score(s::RawScore{LangConfidence}, ::Calibration = default_calibration()) =
+    NormScore(clamp(s.value, 0, 1), [:lang_conf => s.value])
+normalize_score(s::RawScore{OTViolations}, cal::Calibration = default_calibration()) =
+    NormScore(1 / (1 + s.value / cal.ot_scale), [:ot_viol => s.value])
+normalize_score(s::RawScore{CountDistance}, ::Calibration = default_calibration()) =
+    NormScore(1 / (1 + s.value), [:count => s.value])
 
 # combine: merge independent normalized scores into the single ranking currency.
 # Geometric mean keeps the result in [0,1] and punishes any one axis scoring near zero.

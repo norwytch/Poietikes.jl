@@ -76,25 +76,24 @@ function detect_language(text::AbstractString)
     return ranked
 end
 
-# Score of one analysis result, in the common NormScore currency. Free verse scores at a fixed
-# baseline (`_FREEVERSE_BASELINE`, tunable via `set_freeverse_baseline!`): a constrained form
-# must fit better than that to be preferred over "it's just free verse". The baseline is a
-# placeholder pending corpus calibration.
-_score_analysis(a::FormFit)         = normalize_score(RawScore{OTViolations}(   # mean per-line cost
-    isempty(a.linefits) ? a.total_violations : a.total_violations / length(a.linefits)))
-_score_analysis(a::CountFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)))
-_score_analysis(a::SyllabicFit)     = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(a::QuantitativeFit) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(a::TonalFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(a::MatraFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)))
-_score_analysis(a::AllitFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(a::RhymeFit)        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(a::StructureFit)    = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
-_score_analysis(::ProsodicFeatures) = NormScore(_FREEVERSE_BASELINE[], [:free_verse => _FREEVERSE_BASELINE[]])
-_score_analysis(::Unsupported)      = NormScore(0.0, Pair{Symbol,Float64}[])
+# Score of one analysis result, in the common NormScore currency, under a `Calibration`. Free
+# verse scores at `cal.freeverse_baseline`: a constrained form must fit better than that to be
+# preferred over "it's just free verse". The baseline is a placeholder pending corpus calibration.
+_score_analysis(a::FormFit, cal::Calibration = default_calibration()) = normalize_score(RawScore{OTViolations}(  # mean per-line cost
+    isempty(a.linefits) ? a.total_violations : a.total_violations / length(a.linefits)), cal)
+_score_analysis(a::CountFit, cal::Calibration = default_calibration())        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)), cal)
+_score_analysis(a::SyllabicFit, cal::Calibration = default_calibration())     = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(a::QuantitativeFit, cal::Calibration = default_calibration()) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(a::TonalFit, cal::Calibration = default_calibration())        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(a::MatraFit, cal::Calibration = default_calibration())        = normalize_score(RawScore{CountDistance}(Float64(a.total_distance)), cal)
+_score_analysis(a::AllitFit, cal::Calibration = default_calibration())        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(a::RhymeFit, cal::Calibration = default_calibration())        = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(a::StructureFit, cal::Calibration = default_calibration())    = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
+_score_analysis(::ProsodicFeatures, cal::Calibration = default_calibration()) = NormScore(cal.freeverse_baseline, [:free_verse => cal.freeverse_baseline])
+_score_analysis(::Unsupported, ::Calibration = default_calibration())         = NormScore(0.0, Pair{Symbol,Float64}[])
 
-_analyze_form(f::Form, lang::Language, parsed::ParsedPoem) =
-    mode(f, lang) isa Descriptive ? features(parsed) : fit(f, lang, parsed)
+_analyze_form(f::Form, lang::Language, parsed::ParsedPoem, cal::Calibration = default_calibration()) =
+    mode(f, lang) isa Descriptive ? features(parsed) : fit(f, lang, parsed, cal)
 
 """
     detect_form(text, language) -> Vector{Ranked{Form}}
@@ -102,9 +101,9 @@ _analyze_form(f::Form, lang::Language, parsed::ParsedPoem) =
 Ranked form candidates for `language`, best first (length ≥ 1): every supported form is fit
 and scored, free verse included as the baseline.
 """
-function detect_form(text::AbstractString, lang::Language)
+function detect_form(text::AbstractString, lang::Language, cal::Calibration = default_calibration())
     parsed = prosodic_parse(text, lang)
-    ranked = [Ranked(f, _score_analysis(_analyze_form(f, lang, parsed))) for f in supported_forms(lang)]
+    ranked = [Ranked(f, _score_analysis(_analyze_form(f, lang, parsed, cal), cal)) for f in supported_forms(lang)]
     sort!(ranked; by = r -> r.score.value, rev = true)
     return ranked
 end

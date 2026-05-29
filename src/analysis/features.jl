@@ -1,5 +1,5 @@
 # Free-verse descriptive features: extracted from any parse, no template assumed. This is the
-# default mode of the library — most modern poetry lives here.
+# default mode of the package — most modern poetry lives here.
 
 struct ProsodicFeatures <: AnalysisResult
     n_stanzas::Int

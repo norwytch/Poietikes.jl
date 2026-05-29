@@ -38,9 +38,10 @@ end
 
 # Seven-syllable count is declared (invariant + documentation); the composite fit adds harmony.
 countspec(::Cywydd, ::Welsh) = CountSpec(Syllable, [7])
-fit(::Cywydd, ::Welsh, parsed::ParsedPoem) = _cynghanedd_fit(parsed)
+fit(::Cywydd, ::Welsh, parsed::ParsedPoem, ::Calibration = default_calibration()) = _cynghanedd_fit(parsed)
 
-_score_analysis(a::CynghaneddFit) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
+_score_analysis(a::CynghaneddFit, cal::Calibration = default_calibration()) =
+    normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
 
 function scansion(a::CynghaneddFit)
     head = "cynghanedd (7 syll/line; consonant-sequence harmony):"

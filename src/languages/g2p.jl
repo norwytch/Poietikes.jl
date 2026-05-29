@@ -34,7 +34,8 @@ end
 const _G2P = Dict{DataType,G2PBackend}()
 set_backend!(l::Language, b::G2PBackend) = (_G2P[typeof(l)] = b; nothing)
 function g2p_backend(l::Language)
-    haskey(_G2P, typeof(l)) || error("no G2P backend registered for $(typeof(l)); use set_backend!")
+    haskey(_G2P, typeof(l)) || throw(ArgumentError(
+        "no G2P backend registered for $(typeof(l)); register one with set_backend!"))
     return _G2P[typeof(l)]
 end
 

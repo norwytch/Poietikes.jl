@@ -1,7 +1,7 @@
 """
     Poietikes
 
-A form-aware, multilingual prosodic analysis library. See `README.md` for the design and methodology.
+A form-aware, multilingual prosodic analysis package. See `README.md` for the design and methodology.
 
 Phase 1: the (Form × Language) type architecture, the spec/trait system, the form registry,
 the scoring currency, English G2P (CMUdict + rule fallback), syllabification, and free-verse
@@ -81,22 +81,23 @@ export supports, supported_forms, supported_languages
 export detect_language, detect_form
 # Extensibility (DSL)
 export @form, load_forms, formname
-# Scoring
-export ScoreKind, LangConfidence, OTViolations, CountDistance, RawScore, NormScore, normalize_score
-export metrical_costs, calibrate_ot_scale, set_ot_scale!, set_freeverse_baseline!
-export set_constraint_weight!, reset_constraint_weights!, learn_constraint_weights
-# G2P
+# Scoring — the comparable currency users read, the Calibration config, and the tuning knobs
+export NormScore, Calibration, default_calibration, set_ot_scale!, set_freeverse_baseline!
+# G2P — pluggable pronunciation backends
 export G2PBackend, DictBackend, ChainBackend, RuleBackend, CMUDictBackend, LexiqueBackend
 export set_backend!, g2p_backend, pronounce, pronounce_word, phonetic_transcribe
 export syllabify, syllabify_phonemes
-# Metrical parsing (OT)
-export Strength, Strong, Weak, Meter, MetricalParse, build_meter, foot_pattern
-export MetricalConstraint, violations, weight, default_constraints, is_heavy
-export StressMaxInWeak, TroughInStrong, Clash, Lapse, HeavyInWeak, PositionSize, IllegalResolution
-export best_parse, LineFit, FormFit, fit
-# Analysis
-export AnalysisResult, Unsupported, ProsodicFeatures, features, CountFit, SyllabicFit, QuantitativeFit
-export TonalFit, RhymeFit, StructureFit, AllitFit, MatraFit, DrottkvaettFit, CynghaneddFit, rhyme_key
+# Analysis results + the top-level pipeline
+export AnalysisResult, Unsupported, ProsodicFeatures, features
+export CountFit, SyllabicFit, QuantitativeFit, TonalFit, RhymeFit, StructureFit, AllitFit, MatraFit
+export FormFit, DrottkvaettFit, CynghaneddFit, rhyme_key
 export Ranked, Candidate, Analysis, best, confidence, is_confident, analyze, scansion
+
+# Deliberately NOT exported — reach via `Poietikes.` if you need them. The OT metrical-parser
+# internals (Meter, MetricalParse, build_meter, the MetricalConstraint set + `violations`/`weight`,
+# best_parse, LineFit, the `fit` router — note `fit` is unexported to avoid clashing with
+# StatsAPI.fit), the score-kind plumbing (RawScore, ScoreKind and its subtypes, normalize_score),
+# and the corpus-calibration / weight-learning helpers (metrical_costs, calibrate_ot_scale,
+# set_constraint_weight!, reset_constraint_weights!, learn_constraint_weights).
 
 end # module Poietikes

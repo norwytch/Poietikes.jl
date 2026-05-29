@@ -75,9 +75,10 @@ end
 # A six-syllable count is also declared (satisfies the "prescriptive cell has a spec" invariant
 # and documents the constraint); the composite fit overrides routing to check all three axes.
 countspec(::Drottkvaett, ::Norse) = CountSpec(Syllable, [6])
-fit(::Drottkvaett, ::Norse, parsed::ParsedPoem) = _drottkvaett_fit(parsed)
+fit(::Drottkvaett, ::Norse, parsed::ParsedPoem, ::Calibration = default_calibration()) = _drottkvaett_fit(parsed)
 
-_score_analysis(a::DrottkvaettFit) = normalize_score(RawScore{CountDistance}(Float64(a.total_cost)))
+_score_analysis(a::DrottkvaettFit, cal::Calibration = default_calibration()) =
+    normalize_score(RawScore{CountDistance}(Float64(a.total_cost)), cal)
 
 function scansion(a::DrottkvaettFit)
     head = "dróttkvætt (6 syll/line; line-pair alliteration; hending):"

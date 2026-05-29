@@ -107,7 +107,7 @@ a scansion renderer over them — `scansion(x)` (`src/analysis/scansion.jl`) —
 
 ## Conclusion
 
-The libraries are complementary. `prosodic` validated our English OT parser — the constraint sets
+The two are complementary. `prosodic` validated our English OT parser — the constraint sets
 correspond and the two agree on metrical direction, with no divergence attributable to a parser bug.
 The deliberate differences (monosyllable flexibility; fit-vs-scan; breadth over depth) are design
 choices, not defects. Its clearest borrowable idea — human-readable scansion output — we adopted as

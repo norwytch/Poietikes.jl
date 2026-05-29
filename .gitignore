@@ -6,3 +6,5 @@
 *.jl.*.cov
 *.jl.mem
 .DS_Store
+project_map.md
+NOTES.md

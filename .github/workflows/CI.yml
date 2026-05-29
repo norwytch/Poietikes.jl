@@ -1,0 +1,38 @@
+name: CI
+
+# When to run: pushes to main (and tags), and every pull request.
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:        # also allow running it by hand from the Actions tab
+
+# If you push again before a run finishes, cancel the stale run (except on main).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false       # let every combo finish, even if one fails
+      matrix:
+        version:
+          - '1.10'           # minimum supported (matches Project.toml [compat])
+          - '1'              # latest stable 1.x
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4              # get the code
+      - uses: julia-actions/setup-julia@v2     # install the requested Julia
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v2           # cache deps between runs (faster)
+      - uses: julia-actions/julia-buildpkg@v1  # Pkg.instantiate + precompile
+      - uses: julia-actions/julia-runtest@v1   # Pkg.test()

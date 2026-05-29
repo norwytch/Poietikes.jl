@@ -5,7 +5,14 @@ using Test
 using Poietikes: countspec, meterspec, rhymespec, structurespec, allitspec, matraspec, mode, combine, register!,
     _FORMS, _estimate_syllables_english, _parse_cmudict, _morae,
     _french_syllables, _diphthong_nuclei, _ES_VOWELS, _ES_WEAK,
-    _iast_weights, _iast_tokens, gana_pattern, _parse_lexique
+    _iast_weights, _iast_tokens, gana_pattern, _parse_lexique,
+    # metrical-parser internals + score plumbing + calibration (no longer exported as of the API prune)
+    ScoreKind, LangConfidence, OTViolations, CountDistance, RawScore, normalize_score,
+    metrical_costs, calibrate_ot_scale, set_constraint_weight!, reset_constraint_weights!, learn_constraint_weights,
+    Strength, Strong, Weak, Meter, MetricalParse, build_meter, foot_pattern, MetricalConstraint,
+    violations, weight, default_constraints, is_heavy,
+    StressMaxInWeak, TroughInStrong, Clash, Lapse, HeavyInWeak, PositionSize, IllegalResolution,
+    best_parse, LineFit, fit
 
 # Deterministic, offline G2P for the pipeline tests (no network fetch).
 const STUB = Dict(
@@ -122,7 +129,7 @@ end
         s2 = normalize_score(RawScore{OTViolations}(3.0))
         @test 0 ≤ s1.value ≤ 1
         @test 0 ≤ s2.value ≤ 1
-        @test s2.value ≈ 1 / (1 + 3 / Poietikes._OT_SCALE[])   # calibrated OT scale
+        @test s2.value ≈ 1 / (1 + 3 / default_calibration().ot_scale)   # calibrated OT scale
         @test normalize_score(RawScore{OTViolations}(0.0)).value == 1.0
         c = combine(s1, s2)
         @test 0 ≤ c.value ≤ 1
@@ -386,6 +393,24 @@ end
         @test best(analyze(POEM; language = :english, form = :haiku)).analysis isa CountFit
     end
 
+    @testset "IO / file input" begin
+        poem = "ふるいけや\nかわずとびこむ\nみずのおと"
+        path = tempname() * ".txt"
+        write(path, poem)
+        # analyze accepts an open file, equivalent to passing the String
+        a_io = open(io -> analyze(io; language = :japanese, form = :haiku), path)
+        @test best(a_io).form isa Haiku
+        @test best(a_io).score.value == best(analyze(poem; language = :japanese, form = :haiku)).score.value
+        # detect_language and prosodic_parse take IO too
+        @test open(detect_language, path)[1].value isa Japanese
+        @test count(_ -> true, Poietikes.lines(open(io -> prosodic_parse(io, Japanese()), path))) == 3
+    end
+
+    @testset "typed errors (ArgumentError, not bare error)" begin
+        @test_throws ArgumentError analyze("x"; language = :klingon)   # unknown language symbol
+        @test_throws ArgumentError analyze("x"; form = :villanelle)    # unknown form symbol
+    end
+
     # ── Phase 6: extensibility ──
     @testset "@form (programmer-defined)" begin
         @test supports(Lune(), English())                      # registered by the macro
@@ -420,7 +445,7 @@ end
         # a loaded form may not shadow an existing one for the language
         bad = tempname() * ".toml"
         write(bad, "[haiku]\nlanguage = \"english\"\ncount = { unit = \"syllable\", counts = [5,7,5] }\n")
-        @test_throws ErrorException load_forms(bad)
+        @test_throws ArgumentError load_forms(bad)
     end
 
     @testset "load_forms: quantitative pattern + feet" begin
@@ -672,7 +697,7 @@ end
     # ── Tier C: score calibration ──
     @testset "OT score calibration" begin
         @test calibrate_ot_scale([0.0, 0.0], [10.0, 10.0]) == 5.0     # midpoint of the two means
-        old = Poietikes._OT_SCALE[]
+        old = default_calibration().ot_scale
         try
             set_ot_scale!(8.0)
             @test normalize_score(RawScore{OTViolations}(8.0)).value == 0.5   # cost == scale → 0.5
@@ -697,13 +722,25 @@ end
         @test learned isa Dict && haskey(learned, StressMaxInWeak)
         @test all(v -> v >= 0, values(learned))                    # weights are non-negative
 
-        old = Poietikes._FREEVERSE_BASELINE[]
+        old = default_calibration().freeverse_baseline
         try
             set_freeverse_baseline!(0.9)
-            @test Poietikes._FREEVERSE_BASELINE[] == 0.9
+            @test default_calibration().freeverse_baseline == 0.9
         finally
             set_freeverse_baseline!(old)
         end
+    end
+
+    @testset "Calibration as a value (reproducible, no global mutation)" begin
+        # passing a Calibration changes scoring without touching the process default
+        @test normalize_score(RawScore{OTViolations}(8.0), Calibration(ot_scale = 8.0)).value == 0.5
+        hk = "ふるいけや\nかわずとびこむ\nみずのおと"
+        hi = best(analyze(hk; language = :japanese, form = :free_verse, calibration = Calibration(freeverse_baseline = 0.9)))
+        lo = best(analyze(hk; language = :japanese, form = :free_verse, calibration = Calibration(freeverse_baseline = 0.2)))
+        @test hi.score.value == 0.9 && lo.score.value == 0.2          # free-verse score == the passed baseline
+        # the default is untouched — no hidden global was mutated
+        @test default_calibration().ot_scale == 12.0
+        @test default_calibration().freeverse_baseline == 0.6
     end
 
     # ── Tier B: French rhyme via Lexique ──

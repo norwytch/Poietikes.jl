@@ -1,6 +1,8 @@
 using Poietikes
 using Test
 
+include("aqua.jl")
+
 # Reach a few non-exported internals for the structural tests.
 using Poietikes: countspec, meterspec, rhymespec, structurespec, allitspec, matraspec, mode, combine, register!,
     _FORMS, _estimate_syllables_english, _parse_cmudict, _morae,

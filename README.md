@@ -8,7 +8,7 @@ Poietikes.jl treats a poem as a pairing of two independent types, **`(Form × La
 
 ## Install
 
-Poietikes.jl requires **Julia ≥ 1.10**. It's not in Julia's General registry yet, so install it from the repository:
+Poietikes.jl requires **Julia ≥ 1.10**. We're still awaiting approval to the General Registry. In the meantime, you can download it from this repo:
 
 ```julia
 using Pkg

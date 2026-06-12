@@ -8,13 +8,11 @@ Poietikes.jl treats a poem as a pairing of two independent types, **`(Form × La
 
 ## Install
 
-Poietikes.jl requires **Julia ≥ 1.10**. We're still awaiting approval to the General Registry. In the meantime, you can download it from this repo:
+Poietikes.jl requires **Julia ≥ 1.10**.
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/norwytch/Poietikes.jl")
-# …or, for local development:
-Pkg.develop(path = "/path/to/Poietikes.jl")
+Pkg.add("Poietikes")
 ```
 
 Pronunciation data is downloaded and cached on first use — [CMUdict](https://github.com/cmusphinx/cmudict) for English, [Lexique](http://www.lexique.org) for French. All other languages currently use rule-based frontends and need no download. 
@@ -124,7 +122,7 @@ Poietikes.jl is indebted to [`prosodic`](https://github.com/quadrismegistus/pros
 
 ## Status and limitations
 
-Poietikes.jl is pre-1.0 and not yet in Julia's General registry. A few edges worth knowing:
+Poietikes.jl is pre-1.0. A few edges worth knowing:
 
 - **Detection covers seven languages from raw text.** Latin, Arabic, Old Norse, and Welsh are analyzed by naming the language explicitly — their transliteration or orthography reads as Latin script to the detector.
 - **Detection is a closed set — it never returns "unknown."** A text in an unsupported language (German, Russian, …) is mapped to the nearest *supported* language and confidently mislabeled; `is_confident` (a low floor) is the only guard against trusting such a verdict.
